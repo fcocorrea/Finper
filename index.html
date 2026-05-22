@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Finper — Finanzas Personales</title>
+  <meta name="description"
+    content="Plataforma de finanzas personales para registrar ingresos, gastos, cuentas por cobrar y cuentas por pagar.">
+  <link rel="stylesheet" href="styles.css">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+  <!-- SheetJS (XLSX) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+
+<body>
+  <div class="app-container">
+
+    <!-- ===== NAVBAR ===== -->
+    <nav class="navbar">
+      <div class="navbar-brand">
+        <div class="logo-icon">$</div>
+        <span>Finper — Finanzas Personales</span>
+      </div>
+      <div class="navbar-actions">
+        <div class="dropdown">
+          <button class="btn btn-primary" id="btn-add">Añadir <span class="dropdown-caret">▼</span></button>
+          <div class="dropdown-content">
+            <a href="#" id="dropdown-add-income">Ingreso</a>
+            <a href="#" id="dropdown-add-expense">Gasto</a>
+            <a href="#" id="dropdown-add-account">Cuenta</a>
+          </div>
+        </div>
+        <div class="dropdown">
+          <button class="btn btn-outline" id="btn-edit">Edición <span class="dropdown-caret">▼</span></button>
+          <div class="dropdown-content">
+            <a href="#" id="dropdown-edit-income">Ingreso</a>
+            <a href="#" id="dropdown-edit-expense">Gastos</a>
+            <a href="#" id="dropdown-edit-account">Cuenta</a>
+          </div>
+        </div>
+        <button class="btn btn-outline" id="btn-import">Importar</button>
+      </div>
+    </nav>
+
+    <!-- ===== TOOLBAR ===== -->
+    <div class="main-content">
+      <div class="toolbar">
+        <!-- Data Type -->
+        <div class="toolbar-group" id="data-type-toggle">
+          <button class="toggle-btn active" data-type="expenses">Gastos</button>
+          <button class="toggle-btn" data-type="incomes">Ingresos</button>
+          <button class="toggle-btn" data-type="accounts">Cuentas</button>
+        </div>
+
+        <div class="toolbar-separator"></div>
+
+        <!-- View Mode -->
+        <div class="toolbar-group" id="view-mode-toggle">
+          <button class="toggle-btn active" data-view="dashboard">Dashboard</button>
+          <button class="toggle-btn" data-view="table">Tabla</button>
+          <button class="toggle-btn" data-view="pivot">Tabla Dinámica</button>
+        </div>
+
+        <div class="toolbar-separator"></div>
+
+        <!-- Month Picker -->
+        <div class="month-picker">
+          <button class="btn-icon btn-ghost" id="month-prev">&lt;</button>
+          <span class="month-display" id="month-display">Mayo 2026</span>
+          <button class="btn-icon btn-ghost" id="month-next">&gt;</button>
+        </div>
+      </div>
+
+      <!-- ===== VIEWS ===== -->
+      <div id="view-dashboard"></div>
+      <div id="view-table" class="hidden"></div>
+      <div id="view-pivot" class="hidden"></div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: ADD ===== -->
+  <div class="modal-overlay" id="modal-add">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title" id="add-modal-title">Añadir Registro</h2>
+        <button class="modal-close">✕</button>
+      </div>
+      <div id="add-content"></div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: EDITOR ===== -->
+  <div class="modal-overlay" id="modal-editor">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Edición</h2>
+        <button class="modal-close">✕</button>
+      </div>
+      <div id="editor-content"></div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: IMPORT ===== -->
+  <div class="modal-overlay" id="modal-import">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Importar Datos</h2>
+        <button class="modal-close">✕</button>
+      </div>
+      <div id="import-content"></div>
+    </div>
+  </div>
+
+  <!-- ===== MODAL: EDIT ROW ===== -->
+  <div class="modal-overlay" id="modal-edit-row">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 class="modal-title">Editar Registro</h2>
+        <button class="modal-close">✕</button>
+      </div>
+      <div id="edit-row-form"></div>
+      <div class="modal-footer">
+        <button class="btn btn-outline modal-close">Cancelar</button>
+        <button class="btn btn-primary" id="edit-row-save">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CONFIRM DIALOG ===== -->
+  <div class="confirm-overlay" id="confirm-overlay">
+    <div class="confirm-dialog">
+      <div class="confirm-icon">!</div>
+      <h3 class="confirm-title" id="confirm-title">¿Estás seguro?</h3>
+      <p class="confirm-message" id="confirm-message">Esta acción no se puede deshacer.</p>
+      <div class="confirm-actions">
+        <button class="btn btn-outline" id="confirm-no">Cancelar</button>
+        <button class="btn btn-danger" id="confirm-yes">Eliminar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TOAST CONTAINER ===== -->
+  <div class="toast-container" id="toast-container"></div>
+
+  <!-- ===== JS MODULES ===== -->
+  <script src="js/store.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/table.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/importer.js"></script>
+  <script src="js/app.js"></script>
+</body>
+
+</html>
