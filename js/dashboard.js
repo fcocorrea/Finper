@@ -10,6 +10,8 @@ const Dashboard = (() => {
       renderIncomesDashboard(container, month, year);
     } else if (dataType === 'accounts') {
       renderAccountsDashboard(container, month, year);
+    } else if (dataType === 'savings') {
+      renderSavingsDashboard(container, month, year);
     } else {
       renderExpensesDashboard(container, month, year);
     }
@@ -18,15 +20,14 @@ const Dashboard = (() => {
   function renderExpensesDashboard(container, month, year) {
     const totalIncome = Store.getTotalIncome(month, year);
     const totalExpense = Store.getTotalExpenses(month, year);
-    const totalExpenseCore = Store.getTotalExpenses(month, year, ['Deuda', 'Ahorro', 'Inversión']);
 
     // Metrics
-    const pctUsed = totalIncome > 0 ? ((totalExpenseCore / totalIncome) * 100).toFixed(1) : 0;
+    const pctUsed = totalIncome > 0 ? ((totalExpense / totalIncome) * 100).toFixed(1) : 0;
     const today = new Date();
     const daysInMonth = new Date(year, month, 0).getDate();
     const currentDay = (today.getFullYear() === year && today.getMonth() + 1 === month) ? today.getDate() : daysInMonth;
     const remainingDays = daysInMonth - currentDay;
-    const remaining = totalIncome - totalExpenseCore;
+    const remaining = totalIncome - totalExpense;
     const dailyBudget = remainingDays > 0 ? Math.round(remaining / remainingDays) : remaining;
 
     // Comparison with previous month
@@ -41,7 +42,7 @@ const Dashboard = (() => {
         <div class="metric-card">
           <div class="metric-label">% Gastado del Ingreso</div>
           <div class="metric-value ${pctUsed > 100 ? 'negative' : pctUsed > 80 ? 'warning' : 'positive'}">${pctUsed}%</div>
-          <div class="metric-detail">${UI.formatCLP(totalExpenseCore)} de ${UI.formatCLP(totalIncome)}</div>
+          <div class="metric-detail">${UI.formatCLP(totalExpense)} de ${UI.formatCLP(totalIncome)}</div>
         </div>
         <div class="metric-card accent">
           <div class="metric-label">Presupuesto Diario</div>
@@ -131,6 +132,87 @@ const Dashboard = (() => {
     renderIncomeLineChart(month, year);
   }
 
+  function renderSavingsDashboard(container, month, year) {
+    const monthlySavings = Store.getTotalSavings(month, year);
+    const allSavings = Store.getAll('savings');
+    const totalAccumulated = allSavings.reduce((s, r) => s + Store.parseCurrency(r.monto), 0);
+    const records = Store.getByMonth('savings', month, year);
+
+    const categoryMap = {};
+    records.forEach(r => {
+      const cat = r.categoria || 'Sin categoría';
+      categoryMap[cat] = (categoryMap[cat] || 0) + Store.parseCurrency(r.monto);
+    });
+
+    container.innerHTML = `
+      <div class="metrics-grid fade-in">
+        <div class="metric-card success">
+          <div class="metric-label">Ahorros del Mes</div>
+          <div class="metric-value positive">${UI.formatCLP(monthlySavings)}</div>
+          <div class="metric-detail">${records.length} registro(s)</div>
+        </div>
+        <div class="metric-card accent">
+          <div class="metric-label">Total Acumulado</div>
+          <div class="metric-value positive">${UI.formatCLP(totalAccumulated)}</div>
+          <div class="metric-detail">${allSavings.length} movimiento(s) históricos</div>
+        </div>
+      </div>
+      <div class="charts-grid fade-in">
+        <div class="chart-container">
+          <div class="card-header"><h3 class="card-title">Por Categoría (mes)</h3></div>
+          <canvas id="chart-savings-bar"></canvas>
+        </div>
+        <div class="chart-container">
+          <div class="card-header"><h3 class="card-title">Evolución de Ahorros</h3></div>
+          <canvas id="chart-savings-line"></canvas>
+        </div>
+      </div>
+    `;
+
+    const sorted = Object.entries(categoryMap).sort((a, b) => b[1] - a[1]);
+    const ctx1 = document.getElementById('chart-savings-bar').getContext('2d');
+    new Chart(ctx1, {
+      type: 'bar',
+      data: {
+        labels: sorted.map(s => s[0]),
+        datasets: [{ label: 'Monto', data: sorted.map(s => s[1]), backgroundColor: chartColors(sorted.length), borderRadius: 6, maxBarThickness: 40 }]
+      },
+      options: chartBarOptions()
+    });
+
+    const labels = [];
+    const lineData = [];
+    for (let i = 5; i >= 0; i--) {
+      let m = month - i, y = year;
+      while (m < 1) { m += 12; y--; }
+      labels.push(UI.getMonthLabel(m, y));
+      lineData.push(Store.getTotalSavings(m, y));
+    }
+    const ctx2 = document.getElementById('chart-savings-line').getContext('2d');
+    new Chart(ctx2, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Ahorros', data: lineData, borderColor: '#f59e0b',
+          backgroundColor: 'rgba(245,158,11,0.1)', fill: true, tension: 0.4, borderWidth: 2, pointRadius: 4,
+          pointBackgroundColor: '#f59e0b',
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: '#1e293b', usePointStyle: true } },
+          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${UI.formatCLP(ctx.raw)}` } }
+        },
+        scales: {
+          x: { ticks: { color: '#64748b' }, grid: { color: 'rgba(0,0,0,0.06)' } },
+          y: { ticks: { color: '#64748b', callback: v => UI.formatCLP(v) }, grid: { color: 'rgba(0,0,0,0.06)' } }
+        }
+      }
+    });
+  }
+
   function renderAccountsDashboard(container, month, year) {
     const accounts = Store.getAll('accounts');
     const cobrar = accounts.filter(a => a.tipo === 'Cuentas por cobrar');
@@ -197,7 +279,7 @@ const Dashboard = (() => {
       while (m < 1) { m += 12; y--; }
       labels.push(UI.getMonthLabel(m, y));
       incomeData.push(Store.getTotalIncome(m, y));
-      expenseData.push(Store.getTotalExpenses(m, y, ['Deuda', 'Ahorro', 'Inversión']));
+      expenseData.push(Store.getTotalExpenses(m, y));
     }
 
     if (lineChart) lineChart.destroy();

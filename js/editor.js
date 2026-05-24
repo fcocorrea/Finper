@@ -28,6 +28,10 @@ const Editor = (() => {
           <div class="type-card-icon"></div>
           <div class="type-card-label">Cuentas</div>
         </div>
+        <div class="type-card" data-type="savings">
+          <div class="type-card-icon"></div>
+          <div class="type-card-label">Ahorros</div>
+        </div>
       </div>
     `;
     content.querySelectorAll('.type-card').forEach(card => {
@@ -37,7 +41,7 @@ const Editor = (() => {
 
   function renderStep2(dataType) {
     const content = document.getElementById('editor-content');
-    const typeLabel = { expenses: 'Gastos', incomes: 'Ingresos', accounts: 'Cuentas' }[dataType];
+    const typeLabel = { expenses: 'Gastos', incomes: 'Ingresos', accounts: 'Cuentas', savings: 'Ahorros' }[dataType];
 
     let html = `
       <button class="btn btn-ghost btn-sm" id="editor-back" style="margin-bottom:var(--space-4)">← Volver</button>
@@ -63,6 +67,13 @@ const Editor = (() => {
           <div class="type-card-label">Editar categorías</div>
         </div>`;
     }
+    if (dataType === 'savings') {
+      html += `
+        <div class="type-card" data-action="edit-savings-categories">
+          <div class="type-card-icon"></div>
+          <div class="type-card-label">Editar categorías</div>
+        </div>`;
+    }
 
     html += `</div>`;
     content.innerHTML = html;
@@ -76,6 +87,7 @@ const Editor = (() => {
         else if (action === 'add-col') renderAddColumn(dataType);
         else if (action === 'remove-col') renderRemoveColumn(dataType);
         else if (action === 'edit-categories') renderEditCategories();
+        else if (action === 'edit-savings-categories') renderEditSavingsCategories();
       });
     });
   }
@@ -243,6 +255,73 @@ const Editor = (() => {
           const newName = prompt(`Renombrar "${cat}" a:`, cat);
           if (newName && newName.trim() && newName.trim() !== cat) {
             Store.renameCategory(cat, newName.trim());
+            UI.toast(`Categoría renombrada a "${newName.trim()}"`, 'success');
+            renderList();
+          }
+        });
+      });
+    }
+
+    renderList();
+  }
+
+  // ---------- EDIT SAVINGS CATEGORIES ----------
+  function renderEditSavingsCategories() {
+    const content = document.getElementById('editor-content');
+
+    function renderList() {
+      let html = `
+        <button class="btn btn-ghost btn-sm" id="editor-back">← Volver</button>
+        <h3 style="margin:var(--space-4) 0">Editar categorías de ahorros</h3>
+        <div class="form-row" style="margin-bottom:var(--space-4)">
+          <input class="form-input" id="new-cat-input" placeholder="Nueva categoría..." />
+          <button class="btn btn-accent" id="add-cat-btn">Agregar</button>
+        </div>
+        <div style="max-height:300px;overflow-y:auto">
+      `;
+      Store.getSavingsCategories().forEach(cat => {
+        html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--color-border)">
+          <span>${cat}</span>
+          <div style="display:flex;gap:var(--space-1)">
+            <button class="btn btn-ghost btn-sm cat-rename" data-cat="${cat}" style="width:auto;padding:0 var(--space-2);font-size:var(--text-xs)">Renombrar</button>
+            <button class="btn btn-ghost btn-sm cat-delete" data-cat="${cat}" style="width:auto;padding:0 var(--space-2);font-size:var(--text-xs)">Eliminar</button>
+          </div>
+        </div>`;
+      });
+      html += `</div>`;
+      content.innerHTML = html;
+
+      document.getElementById('editor-back').addEventListener('click', () => renderStep2('savings'));
+      document.getElementById('add-cat-btn').addEventListener('click', () => {
+        const name = document.getElementById('new-cat-input').value.trim();
+        if (!name) return;
+        if (Store.addSavingsCategory(name)) {
+          UI.toast(`Categoría "${name}" agregada`, 'success');
+          renderList();
+        } else {
+          UI.toast('La categoría ya existe', 'warning');
+        }
+      });
+
+      content.querySelectorAll('.cat-delete').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const cat = btn.dataset.cat;
+          const result = Store.removeSavingsCategory(cat);
+          if (result.error === 'in_use') {
+            UI.toast(`No se puede eliminar "${cat}" porque está en uso`, 'error');
+          } else {
+            UI.toast(`Categoría "${cat}" eliminada`, 'success');
+            renderList();
+          }
+        });
+      });
+
+      content.querySelectorAll('.cat-rename').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const cat = btn.dataset.cat;
+          const newName = prompt(`Renombrar "${cat}" a:`, cat);
+          if (newName && newName.trim() && newName.trim() !== cat) {
+            Store.renameSavingsCategory(cat, newName.trim());
             UI.toast(`Categoría renombrada a "${newName.trim()}"`, 'success');
             renderList();
           }

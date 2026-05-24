@@ -47,6 +47,11 @@ const App = (() => {
       renderAddForm('accounts');
       UI.openModal('modal-add');
     });
+    document.getElementById('dropdown-add-savings').addEventListener('click', (e) => {
+      e.preventDefault();
+      renderAddForm('savings');
+      UI.openModal('modal-add');
+    });
 
     // Dropdown "Edición" options
     document.getElementById('dropdown-edit-income').addEventListener('click', (e) => {
@@ -60,6 +65,10 @@ const App = (() => {
     document.getElementById('dropdown-edit-account').addEventListener('click', (e) => {
       e.preventDefault();
       Editor.open('accounts');
+    });
+    document.getElementById('dropdown-edit-savings').addEventListener('click', (e) => {
+      e.preventDefault();
+      Editor.open('savings');
     });
 
     document.getElementById('btn-import').addEventListener('click', () => Importer.open());
@@ -121,6 +130,10 @@ const App = (() => {
         <div class="type-card" data-add-type="accounts">
           <div class="type-card-icon">📒</div>
           <div class="type-card-label">Cuenta</div>
+        </div>
+        <div class="type-card" data-add-type="savings">
+          <div class="type-card-icon">🏦</div>
+          <div class="type-card-label">Ahorro / Inversión</div>
         </div>
       </div>
     `;
@@ -361,6 +374,63 @@ const App = (() => {
         if (!fecha || !persona || !monto) { UI.toast('Completa los campos obligatorios', 'warning'); return; }
         Store.add('accounts', { fecha, persona, descripcion, tipo, monto });
         UI.toast('Cuenta registrada', 'success');
+        UI.closeModal('modal-add');
+        refresh();
+      });
+
+    } else if (type === 'savings') {
+      title.textContent = 'Registrar Ahorro / Inversión';
+      content.innerHTML = `
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Fecha (dd-mm-yy)</label>
+            <input class="form-input" id="add-fecha" placeholder="09-05-26" value="${UI.formatDateDMY(new Date())}" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mes (mm-yy)</label>
+            <input class="form-input" id="add-mesPago" placeholder="05-26" value="${UI.formatDateMY(new Date())}" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Categoría</label>
+          <select class="form-select" id="add-categoria"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Monto (CLP)</label>
+          <input class="form-input" id="add-monto" type="number" placeholder="0" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Descripción</label>
+          <input class="form-input" id="add-descripcion" placeholder="Detalle del movimiento..." />
+        </div>
+        <div class="form-group autocomplete-wrapper">
+          <label class="form-label">Institución</label>
+          <input class="form-input" id="add-institucion" placeholder="Banco, Corredora, AFP..." />
+        </div>
+        <div class="modal-footer">
+          <button class="btn btn-outline" id="add-back">← Volver</button>
+          <button class="btn btn-primary" id="add-save">Guardar</button>
+        </div>
+      `;
+
+      UI.renderSelectOptions(document.getElementById('add-categoria'), Store.getSavingsCategories(), 'Seleccionar categoría...');
+      UI.setupAutocomplete(
+        document.getElementById('add-institucion'),
+        () => Store.getSuggestions('savings', 'institucion'),
+        null
+      );
+
+      document.getElementById('add-back').addEventListener('click', renderAddStep1);
+      document.getElementById('add-save').addEventListener('click', () => {
+        const fecha = document.getElementById('add-fecha').value.trim();
+        const mesPago = document.getElementById('add-mesPago').value.trim();
+        const categoria = document.getElementById('add-categoria').value;
+        const monto = parseInt(document.getElementById('add-monto').value) || 0;
+        const descripcion = document.getElementById('add-descripcion').value.trim();
+        const institucion = document.getElementById('add-institucion').value.trim();
+        if (!fecha || !monto || !categoria) { UI.toast('Completa los campos obligatorios', 'warning'); return; }
+        Store.add('savings', { fecha, mesPago, categoria, monto, descripcion, institucion });
+        UI.toast('Ahorro / Inversión registrado', 'success');
         UI.closeModal('modal-add');
         refresh();
       });

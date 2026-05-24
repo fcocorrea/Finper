@@ -5,12 +5,14 @@ const Store = (() => {
     expenses: 'finper_expenses',
     incomes: 'finper_incomes',
     accounts: 'finper_accounts',
+    savings: 'finper_savings',
     categories: 'finper_categories',
     expenseTypes: 'finper_expense_types',
     paymentMethods: 'finper_payment_methods',
     columns: 'finper_columns',
     accountTypes: 'finper_account_types',
     incomeSources: 'finper_income_sources',
+    savingsCategories: 'finper_savings_categories',
   };
 
   const DEFAULT_CATEGORIES = [
@@ -20,7 +22,11 @@ const Store = (() => {
     'Software', 'Vivienda', 'Panorama', 'Energia', 'Niñitas', 'Utilidad'
   ];
 
-  const DEFAULT_EXPENSE_TYPES = ['Variable', 'Fijo', 'Deuda', 'Ahorro', 'Inversión'];
+  const DEFAULT_SAVINGS_CATEGORIES = [
+    'Fondo Mutuo', 'Depósito a Plazo', 'Acciones', 'ETF', 'AFP/Pensión', 'Efectivo', 'Otros',
+  ];
+
+  const DEFAULT_EXPENSE_TYPES = ['Variable', 'Fijo', 'Deuda'];
   const DEFAULT_PAYMENT_METHODS = ['Tarjeta de crédito', 'Cuenta corriente', 'Tarjeta de crédito en cuotas'];
   const DEFAULT_ACCOUNT_TYPES = ['Cuentas por cobrar', 'Cuentas por pagar'];
 
@@ -45,6 +51,14 @@ const Store = (() => {
       { key: 'descripcion', label: 'Descripción', type: 'text' },
       { key: 'tipo', label: 'Tipo', type: 'select' },
       { key: 'monto', label: 'Monto', type: 'currency' },
+    ],
+    savings: [
+      { key: 'fecha', label: 'Fecha', type: 'date-dmy' },
+      { key: 'mesPago', label: 'Mes', type: 'date-my' },
+      { key: 'categoria', label: 'Categoría', type: 'select' },
+      { key: 'monto', label: 'Monto', type: 'currency' },
+      { key: 'descripcion', label: 'Descripción', type: 'text' },
+      { key: 'institucion', label: 'Institución', type: 'text' },
     ],
   };
 
@@ -75,7 +89,9 @@ const Store = (() => {
     if (!_get(KEYS.expenses)) _set(KEYS.expenses, []);
     if (!_get(KEYS.incomes)) _set(KEYS.incomes, []);
     if (!_get(KEYS.accounts)) _set(KEYS.accounts, []);
+    if (!_get(KEYS.savings)) _set(KEYS.savings, []);
     if (!_get(KEYS.incomeSources)) _set(KEYS.incomeSources, []);
+    if (!_get(KEYS.savingsCategories)) _set(KEYS.savingsCategories, DEFAULT_SAVINGS_CATEGORIES);
   }
 
   // ---------- GENERIC CRUD ----------
@@ -195,11 +211,38 @@ const Store = (() => {
   }
 
   // ---------- FILTERS ----------
+  // ---------- SAVINGS CATEGORIES ----------
+  function getSavingsCategories() { return _get(KEYS.savingsCategories) || []; }
+  function addSavingsCategory(name) {
+    const cats = getSavingsCategories();
+    if (cats.includes(name)) return false;
+    cats.push(name);
+    _set(KEYS.savingsCategories, cats);
+    return true;
+  }
+  function removeSavingsCategory(name) {
+    const records = getAll('savings');
+    if (records.some(r => r.categoria === name)) return { error: 'in_use' };
+    _set(KEYS.savingsCategories, getSavingsCategories().filter(c => c !== name));
+    return { success: true };
+  }
+  function renameSavingsCategory(oldName, newName) {
+    const cats = getSavingsCategories();
+    const idx = cats.indexOf(oldName);
+    if (idx === -1) return false;
+    cats[idx] = newName;
+    _set(KEYS.savingsCategories, cats);
+    const records = getAll('savings');
+    records.forEach(r => { if (r.categoria === oldName) r.categoria = newName; });
+    _set(KEYS.savings, records);
+    return true;
+  }
+
   function getByMonth(type, month, year) {
     const all = getAll(type);
     return all.filter(record => {
       let dateStr;
-      if (type === 'expenses') {
+      if (type === 'expenses' || type === 'savings') {
         dateStr = record.mesPago || record.fecha;
       } else {
         dateStr = record.fecha;
@@ -215,16 +258,14 @@ const Store = (() => {
     if (!dateStr) return null;
     const parts = dateStr.split('-');
     if (type === 'incomes') {
-      // mm-yy
       if (parts.length === 2) {
         return { month: parseInt(parts[0]), year: 2000 + parseInt(parts[1]) };
       }
     } else {
-      // dd-mm-yy
+      // expenses, savings, accounts: dd-mm-yy or mm-yy (mesPago)
       if (parts.length === 3) {
         return { day: parseInt(parts[0]), month: parseInt(parts[1]), year: 2000 + parseInt(parts[2]) };
       }
-      // mm-yy (for mesPago)
       if (parts.length === 2) {
         return { month: parseInt(parts[0]), year: 2000 + parseInt(parts[1]) };
       }
@@ -238,13 +279,16 @@ const Store = (() => {
     return data.reduce((sum, r) => sum + (parseCurrency(r.monto) || 0), 0);
   }
 
-  // Get total expenses for a month (optionally excluding types)
-  function getTotalExpenses(month, year, excludeTypes = []) {
-    let data = getByMonth('expenses', month, year);
-    if (excludeTypes.length) {
-      data = data.filter(e => !excludeTypes.includes(e.tipo));
-    }
+  // Get total expenses for a month
+  function getTotalExpenses(month, year) {
+    const data = getByMonth('expenses', month, year);
     return data.reduce((sum, r) => sum + (parseCurrency(r.gasto) || 0), 0);
+  }
+
+  // Get total savings for a month
+  function getTotalSavings(month, year) {
+    const data = getByMonth('savings', month, year);
+    return data.reduce((sum, r) => sum + (parseCurrency(r.monto) || 0), 0);
   }
 
   function parseCurrency(val) {
@@ -256,12 +300,13 @@ const Store = (() => {
   return {
     init, getAll, add, update, remove, bulkAdd,
     getCategories, addCategory, removeCategory, renameCategory,
+    getSavingsCategories, addSavingsCategory, removeSavingsCategory, renameSavingsCategory,
     getExpenseTypes, getPaymentMethods, getAccountTypes,
     getColumns, setColumns,
     getIncomeSources, addIncomeSource,
     getSuggestions, predictCategory,
     getByMonth, parseRecordDate,
-    getTotalIncome, getTotalExpenses, parseCurrency,
+    getTotalIncome, getTotalExpenses, getTotalSavings, parseCurrency,
     DEFAULT_COLUMNS,
   };
 })();

@@ -6,7 +6,7 @@ const TableView = (() => {
     const container = document.getElementById('view-table');
     const columns = Store.getColumns(dataType);
     const data = (dataType === 'accounts')
-      ? Store.getAll('accounts')
+      ? Store.getAll(dataType)
       : Store.getByMonth(dataType, month, year);
 
     if (!data.length) {
@@ -73,7 +73,8 @@ const TableView = (() => {
       const val = record[col.key] || '';
       if (col.type === 'select') {
         let options = [];
-        if (col.key === 'categoria') options = Store.getCategories();
+        if (col.key === 'categoria' && dataType === 'savings') options = Store.getSavingsCategories();
+        else if (col.key === 'categoria') options = Store.getCategories();
         else if (col.key === 'tipo' && dataType === 'expenses') options = Store.getExpenseTypes();
         else if (col.key === 'tipo' && dataType === 'accounts') options = Store.getAccountTypes();
         else if (col.key === 'medioPago') options = Store.getPaymentMethods();
@@ -112,6 +113,8 @@ const TableView = (() => {
       renderExpensePivot(container, month, year);
     } else if (dataType === 'incomes') {
       renderIncomePivot(container, month, year);
+    } else if (dataType === 'savings') {
+      renderSavingsPivot(container, month, year);
     } else {
       renderAccountPivot(container);
     }
@@ -223,6 +226,58 @@ const TableView = (() => {
     container.innerHTML = html;
   }
 
+  function renderSavingsPivot(container, month, year) {
+    const allSavings = Store.getAll('savings');
+    const categories = Store.getSavingsCategories();
+    const monthKeys = collectMonths(allSavings, 'savings', month, year);
+
+    if (!monthKeys.length) { container.innerHTML = emptyPivot(); return; }
+
+    const pivot = {};
+    monthKeys.forEach(mk => { pivot[mk] = {}; categories.forEach(c => pivot[mk][c] = 0); });
+
+    allSavings.forEach(r => {
+      const mp = r.mesPago || r.fecha;
+      const parsed = Store.parseRecordDate('savings', mp);
+      if (!parsed) return;
+      const mk = `${String(parsed.month).padStart(2, '0')}-${String(parsed.year).slice(-2)}`;
+      if (!pivot[mk]) return;
+      const cat = r.categoria || 'Sin categoría';
+      if (!pivot[mk][cat]) pivot[mk][cat] = 0;
+      pivot[mk][cat] += Store.parseCurrency(r.monto);
+    });
+
+    const usedCategories = categories.filter(c => monthKeys.some(mk => pivot[mk][c] > 0));
+    if (!usedCategories.length) { container.innerHTML = emptyPivot(); return; }
+
+    let html = `<div class="table-wrapper fade-in"><table class="data-table pivot-table">
+      <thead><tr><th>Mes</th>`;
+    usedCategories.forEach(c => { html += `<th>${c}</th>`; });
+    html += `<th>Total</th></tr></thead><tbody>`;
+
+    monthKeys.forEach(mk => {
+      html += `<tr><td><strong>${mk}</strong></td>`;
+      let rowTotal = 0;
+      usedCategories.forEach(c => {
+        const v = pivot[mk][c] || 0;
+        rowTotal += v;
+        html += `<td class="pivot-cell-value">${v ? UI.formatCLP(v) : '-'}</td>`;
+      });
+      html += `<td class="pivot-cell-value pivot-total">${UI.formatCLP(rowTotal)}</td></tr>`;
+    });
+
+    html += `<tr class="pivot-total"><td><strong>Total</strong></td>`;
+    let grandTotal = 0;
+    usedCategories.forEach(c => {
+      const colTotal = monthKeys.reduce((s, mk) => s + (pivot[mk][c] || 0), 0);
+      grandTotal += colTotal;
+      html += `<td class="pivot-cell-value">${UI.formatCLP(colTotal)}</td>`;
+    });
+    html += `<td class="pivot-cell-value">${UI.formatCLP(grandTotal)}</td></tr>`;
+    html += `</tbody></table></div>`;
+    container.innerHTML = html;
+  }
+
   function renderAccountPivot(container) {
     const accounts = Store.getAll('accounts');
     if (!accounts.length) { container.innerHTML = emptyPivot(); return; }
@@ -253,7 +308,7 @@ const TableView = (() => {
   function collectMonths(records, type, upToMonth, upToYear) {
     const months = new Set();
     records.forEach(r => {
-      const dateField = (type === 'expenses') ? (r.mesPago || r.fecha) : r.fecha;
+      const dateField = (type === 'expenses' || type === 'savings') ? (r.mesPago || r.fecha) : r.fecha;
       const parsed = Store.parseRecordDate(type, dateField);
       if (!parsed) return;
       if (parsed.year < upToYear || (parsed.year === upToYear && parsed.month <= upToMonth)) {
@@ -266,6 +321,7 @@ const TableView = (() => {
   function emptyPivot() {
     return `<div class="empty-state fade-in">
       <div class="empty-state-text">Sin datos para tabla dinámica</div>
+      <div class="empty-state-hint">Usa el botón "Añadir" para comenzar a registrar</div>
     </div>`;
   }
 

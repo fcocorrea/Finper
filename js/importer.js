@@ -16,6 +16,7 @@ const Importer = (() => {
           <option value="expenses">Gastos</option>
           <option value="incomes">Ingresos</option>
           <option value="accounts">Cuentas</option>
+          <option value="savings">Ahorros / Inversiones</option>
         </select>
       </div>
       <div class="file-drop" id="file-drop-zone">
