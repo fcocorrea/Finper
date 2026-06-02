@@ -121,159 +121,85 @@ const TableView = (() => {
   }
 
   function renderExpensePivot(container, month, year) {
-    const allExpenses = Store.getAll('expenses');
+    const expenses = Store.getByMonth('expenses', month, year);
     const categories = Store.getCategories();
+    const monthLabel = UI.getMonthLabel(month, year);
 
-    // Collect months up to selected
-    const monthKeys = collectMonths(allExpenses, 'expenses', month, year);
-    if (!monthKeys.length) {
-      container.innerHTML = emptyPivot();
-      return;
-    }
-
-    // Build pivot data: { monthKey: { category: total } }
-    const pivot = {};
-    monthKeys.forEach(mk => { pivot[mk] = {}; categories.forEach(c => pivot[mk][c] = 0); });
-
-    allExpenses.forEach(e => {
-      const mp = e.mesPago || e.fecha;
-      const parsed = Store.parseRecordDate('expenses', mp);
-      if (!parsed) return;
-      const mk = `${String(parsed.month).padStart(2, '0')}-${String(parsed.year).slice(-2)}`;
-      if (!pivot[mk]) return;
+    const totals = {};
+    expenses.forEach(e => {
       const cat = e.categoria || 'Sin categoría';
-      if (!pivot[mk][cat]) pivot[mk][cat] = 0;
-      pivot[mk][cat] += Store.parseCurrency(e.gasto);
+      totals[cat] = (totals[cat] || 0) + Store.parseCurrency(e.gasto);
     });
 
-    // Get categories that have data
-    const usedCategories = categories.filter(c =>
-      monthKeys.some(mk => pivot[mk][c] > 0)
-    );
+    const usedCategories = categories.filter(c => totals[c] > 0);
+    if (!usedCategories.length) { container.innerHTML = emptyPivot(); return; }
 
-    if (!usedCategories.length) {
-      container.innerHTML = emptyPivot();
-      return;
-    }
-
-    let html = `<div class="table-wrapper fade-in"><table class="data-table pivot-table">
-      <thead><tr><th>Mes</th>`;
-    usedCategories.forEach(c => { html += `<th>${c}</th>`; });
-    html += `<th>Total</th></tr></thead><tbody>`;
-
-    monthKeys.forEach(mk => {
-      html += `<tr><td><strong>${mk}</strong></td>`;
-      let rowTotal = 0;
-      usedCategories.forEach(c => {
-        const v = pivot[mk][c] || 0;
-        rowTotal += v;
-        html += `<td class="pivot-cell-value">${v ? UI.formatCLP(v) : '-'}</td>`;
-      });
-      html += `<td class="pivot-cell-value pivot-total">${UI.formatCLP(rowTotal)}</td></tr>`;
-    });
-
-    // Grand totals
-    html += `<tr class="pivot-total"><td><strong>Total</strong></td>`;
     let grandTotal = 0;
+    let html = `<div class="table-wrapper fade-in"><table class="data-table pivot-table">
+      <thead><tr><th>Categoría</th><th>${monthLabel}</th></tr></thead><tbody>`;
+
     usedCategories.forEach(c => {
-      const colTotal = monthKeys.reduce((s, mk) => s + (pivot[mk][c] || 0), 0);
-      grandTotal += colTotal;
-      html += `<td class="pivot-cell-value">${UI.formatCLP(colTotal)}</td>`;
+      const v = totals[c];
+      grandTotal += v;
+      html += `<tr><td><strong>${c}</strong></td><td class="pivot-cell-value">${UI.formatCLP(v)}</td></tr>`;
     });
-    html += `<td class="pivot-cell-value">${UI.formatCLP(grandTotal)}</td></tr>`;
+
+    html += `<tr class="pivot-total"><td><strong>Total</strong></td><td class="pivot-cell-value">${UI.formatCLP(grandTotal)}</td></tr>`;
     html += `</tbody></table></div>`;
     container.innerHTML = html;
   }
 
   function renderIncomePivot(container, month, year) {
-    const allIncomes = Store.getAll('incomes');
-    const sources = [...new Set(allIncomes.map(i => i.fuente || 'Sin fuente'))];
-    const monthKeys = collectMonths(allIncomes, 'incomes', month, year);
+    const incomes = Store.getByMonth('incomes', month, year);
+    const monthLabel = UI.getMonthLabel(month, year);
 
-    if (!monthKeys.length || !sources.length) {
-      container.innerHTML = emptyPivot();
-      return;
-    }
+    if (!incomes.length) { container.innerHTML = emptyPivot(); return; }
 
-    const pivot = {};
-    monthKeys.forEach(mk => { pivot[mk] = {}; sources.forEach(s => pivot[mk][s] = 0); });
-
-    allIncomes.forEach(i => {
-      const parsed = Store.parseRecordDate('incomes', i.fecha);
-      if (!parsed) return;
-      const mk = `${String(parsed.month).padStart(2, '0')}-${String(parsed.year).slice(-2)}`;
-      if (!pivot[mk]) return;
+    const sourceMap = {};
+    incomes.forEach(i => {
       const src = i.fuente || 'Sin fuente';
-      pivot[mk][src] = (pivot[mk][src] || 0) + Store.parseCurrency(i.monto);
+      sourceMap[src] = (sourceMap[src] || 0) + Store.parseCurrency(i.monto);
     });
 
+    let grandTotal = 0;
     let html = `<div class="table-wrapper fade-in"><table class="data-table pivot-table">
-      <thead><tr><th>Mes</th>`;
-    sources.forEach(s => { html += `<th>${s}</th>`; });
-    html += `<th>Total</th></tr></thead><tbody>`;
+      <thead><tr><th>Fuente</th><th>${monthLabel}</th></tr></thead><tbody>`;
 
-    monthKeys.forEach(mk => {
-      html += `<tr><td><strong>${mk}</strong></td>`;
-      let rowTotal = 0;
-      sources.forEach(s => {
-        const v = pivot[mk][s] || 0;
-        rowTotal += v;
-        html += `<td class="pivot-cell-value">${v ? UI.formatCLP(v) : '-'}</td>`;
-      });
-      html += `<td class="pivot-cell-value pivot-total">${UI.formatCLP(rowTotal)}</td></tr>`;
+    Object.entries(sourceMap).forEach(([src, v]) => {
+      grandTotal += v;
+      html += `<tr><td><strong>${src}</strong></td><td class="pivot-cell-value">${UI.formatCLP(v)}</td></tr>`;
     });
+
+    html += `<tr class="pivot-total"><td><strong>Total</strong></td><td class="pivot-cell-value">${UI.formatCLP(grandTotal)}</td></tr>`;
     html += `</tbody></table></div>`;
     container.innerHTML = html;
   }
 
   function renderSavingsPivot(container, month, year) {
-    const allSavings = Store.getAll('savings');
+    const savings = Store.getByMonth('savings', month, year);
     const categories = Store.getSavingsCategories();
-    const monthKeys = collectMonths(allSavings, 'savings', month, year);
+    const monthLabel = UI.getMonthLabel(month, year);
 
-    if (!monthKeys.length) { container.innerHTML = emptyPivot(); return; }
-
-    const pivot = {};
-    monthKeys.forEach(mk => { pivot[mk] = {}; categories.forEach(c => pivot[mk][c] = 0); });
-
-    allSavings.forEach(r => {
-      const mp = r.mesPago || r.fecha;
-      const parsed = Store.parseRecordDate('savings', mp);
-      if (!parsed) return;
-      const mk = `${String(parsed.month).padStart(2, '0')}-${String(parsed.year).slice(-2)}`;
-      if (!pivot[mk]) return;
+    const totals = {};
+    savings.forEach(r => {
       const cat = r.categoria || 'Sin categoría';
-      if (!pivot[mk][cat]) pivot[mk][cat] = 0;
-      pivot[mk][cat] += Store.parseCurrency(r.monto);
+      totals[cat] = (totals[cat] || 0) + Store.parseCurrency(r.monto);
     });
 
-    const usedCategories = categories.filter(c => monthKeys.some(mk => pivot[mk][c] > 0));
+    const usedCategories = categories.filter(c => totals[c] > 0);
     if (!usedCategories.length) { container.innerHTML = emptyPivot(); return; }
 
-    let html = `<div class="table-wrapper fade-in"><table class="data-table pivot-table">
-      <thead><tr><th>Mes</th>`;
-    usedCategories.forEach(c => { html += `<th>${c}</th>`; });
-    html += `<th>Total</th></tr></thead><tbody>`;
-
-    monthKeys.forEach(mk => {
-      html += `<tr><td><strong>${mk}</strong></td>`;
-      let rowTotal = 0;
-      usedCategories.forEach(c => {
-        const v = pivot[mk][c] || 0;
-        rowTotal += v;
-        html += `<td class="pivot-cell-value">${v ? UI.formatCLP(v) : '-'}</td>`;
-      });
-      html += `<td class="pivot-cell-value pivot-total">${UI.formatCLP(rowTotal)}</td></tr>`;
-    });
-
-    html += `<tr class="pivot-total"><td><strong>Total</strong></td>`;
     let grandTotal = 0;
+    let html = `<div class="table-wrapper fade-in"><table class="data-table pivot-table">
+      <thead><tr><th>Categoría</th><th>${monthLabel}</th></tr></thead><tbody>`;
+
     usedCategories.forEach(c => {
-      const colTotal = monthKeys.reduce((s, mk) => s + (pivot[mk][c] || 0), 0);
-      grandTotal += colTotal;
-      html += `<td class="pivot-cell-value">${UI.formatCLP(colTotal)}</td>`;
+      const v = totals[c];
+      grandTotal += v;
+      html += `<tr><td><strong>${c}</strong></td><td class="pivot-cell-value">${UI.formatCLP(v)}</td></tr>`;
     });
-    html += `<td class="pivot-cell-value">${UI.formatCLP(grandTotal)}</td></tr>`;
+
+    html += `<tr class="pivot-total"><td><strong>Total</strong></td><td class="pivot-cell-value">${UI.formatCLP(grandTotal)}</td></tr>`;
     html += `</tbody></table></div>`;
     container.innerHTML = html;
   }
@@ -303,19 +229,6 @@ const TableView = (() => {
     });
     html += `</tbody></table></div>`;
     container.innerHTML = html;
-  }
-
-  function collectMonths(records, type, upToMonth, upToYear) {
-    const months = new Set();
-    records.forEach(r => {
-      const dateField = (type === 'expenses' || type === 'savings') ? (r.mesPago || r.fecha) : r.fecha;
-      const parsed = Store.parseRecordDate(type, dateField);
-      if (!parsed) return;
-      if (parsed.year < upToYear || (parsed.year === upToYear && parsed.month <= upToMonth)) {
-        months.add(`${String(parsed.month).padStart(2, '0')}-${String(parsed.year).slice(-2)}`);
-      }
-    });
-    return [...months].sort();
   }
 
   function emptyPivot() {

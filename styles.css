@@ -413,6 +413,30 @@ body {
   max-height: 350px;
 }
 
+.chart-balance {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  font-size: var(--text-sm);
+}
+
+.chart-balance-label {
+  color: var(--color-muted);
+  font-weight: 500;
+}
+
+.chart-balance-value {
+  font-weight: 700;
+  font-size: var(--text-base);
+}
+
+.chart-balance.positive .chart-balance-value { color: var(--color-success); }
+.chart-balance.negative .chart-balance-value { color: var(--color-danger); }
+
 /* ===== TABLES ===== */
 .table-wrapper {
   overflow-x: auto;
@@ -1092,6 +1116,75 @@ body {
 
 .dropdown:hover .dropdown-caret {
   transform: rotate(180deg);
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--color-border);
+  margin: var(--space-1) 0;
+}
+
+.dropdown-content a.danger {
+  color: var(--color-danger);
+}
+
+.dropdown-content a.danger:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: var(--color-danger);
+}
+
+/* ===== CHECKBOX GROUP ===== */
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.checkbox-label:hover {
+  background: var(--color-surface-2);
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+/* ===== IMPORT BANNERS ===== */
+.import-banner {
+  border-radius: var(--radius-sm);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-3);
+  line-height: 1.6;
+}
+
+.import-banner--error {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--color-danger);
+}
+
+.import-banner--warning {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #92400e;
 }
 
 /* ===== HIDDEN UTILITY ===== */

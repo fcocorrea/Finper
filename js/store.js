@@ -23,7 +23,7 @@ const Store = (() => {
   ];
 
   const DEFAULT_SAVINGS_CATEGORIES = [
-    'Fondo Mutuo', 'Depósito a Plazo', 'Acciones', 'ETF', 'AFP/Pensión', 'Efectivo', 'Otros',
+    'Fondo Mutuo', 'Depósito a Plazo', 'Acciones', 'ETF', 'AFP/Pensión', 'Efectivo', 'Trading', 'Otros',
   ];
 
   const DEFAULT_EXPENSE_TYPES = ['Variable', 'Fijo', 'Deuda'];
@@ -92,6 +92,58 @@ const Store = (() => {
     if (!_get(KEYS.savings)) _set(KEYS.savings, []);
     if (!_get(KEYS.incomeSources)) _set(KEYS.incomeSources, []);
     if (!_get(KEYS.savingsCategories)) _set(KEYS.savingsCategories, DEFAULT_SAVINGS_CATEGORIES);
+    const _sc = _get(KEYS.savingsCategories);
+    if (_sc && !_sc.includes('Trading')) _set(KEYS.savingsCategories, [..._sc, 'Trading']);
+
+    _migrateExpensesToSavings();
+
+    if (typeof Sync !== 'undefined') {
+      Sync.init();
+      Sync.pull().then(ok => {
+        if (typeof App !== 'undefined') {
+          UI.toast(ok ? 'Sincronizado con la nube ☁' : 'Sin conexión — datos locales', ok ? 'success' : 'warning');
+          App.refresh();
+        }
+      });
+    }
+  }
+
+  function _migrateExpensesToSavings() {
+    const MIGRATION_KEY = 'finper_migration_savings_v1';
+    if (localStorage.getItem(MIGRATION_KEY)) return;
+
+    const expenses = getAll('expenses');
+    const savingsCats = getSavingsCategories();
+
+    const isSavingsRecord = e =>
+      e.tipo === 'Ahorro' || e.tipo === 'Inversión' || savingsCats.includes(e.categoria);
+
+    const toMigrate = expenses.filter(isSavingsRecord);
+
+    if (toMigrate.length) {
+      const existing = getAll('savings');
+      const migrated = toMigrate.map(e => {
+        const cat = savingsCats.includes(e.categoria) ? e.categoria : 'Otros';
+        // mesPago on savings uses mm-yy; derive from fecha (dd-mm-yy) if missing
+        const mesPago = e.mesPago || (e.fecha ? e.fecha.slice(3) : '');
+        return {
+          id: e.id,
+          fecha: e.fecha,
+          mesPago,
+          categoria: cat,
+          monto: e.gasto,
+          descripcion: e.comentario || '',
+          institucion: '',
+          _created: e._created,
+          _updated: e._updated,
+        };
+      });
+
+      _set(KEYS.savings, [...existing, ...migrated]);
+      _set(KEYS.expenses, expenses.filter(e => !isSavingsRecord(e)));
+    }
+
+    localStorage.setItem(MIGRATION_KEY, '1');
   }
 
   // ---------- GENERIC CRUD ----------
@@ -103,6 +155,7 @@ const Store = (() => {
     record._created = new Date().toISOString();
     list.push(record);
     _set(KEYS[type], list);
+    if (typeof Sync !== 'undefined') Sync.pushAdd(type, record);
     return record;
   }
 
@@ -112,24 +165,40 @@ const Store = (() => {
     if (idx === -1) return null;
     list[idx] = { ...list[idx], ...updates, _updated: new Date().toISOString() };
     _set(KEYS[type], list);
+    if (typeof Sync !== 'undefined') Sync.pushUpdate(type, list[idx]);
     return list[idx];
   }
 
   function remove(type, id) {
     let list = getAll(type);
+    const record = list.find(r => r.id === id);
     list = list.filter(r => r.id !== id);
     _set(KEYS[type], list);
+    if (typeof Sync !== 'undefined' && record?._supabase_id) {
+      Sync.pushRemove(type, record._supabase_id);
+    }
+  }
+
+  function clearAll(type) {
+    const list = getAll(type);
+    _set(KEYS[type], []);
+    if (typeof Sync !== 'undefined') {
+      list.forEach(r => { if (r._supabase_id) Sync.pushRemove(type, r._supabase_id); });
+    }
   }
 
   function bulkAdd(type, records) {
     const list = getAll(type);
+    const added = [];
     records.forEach(r => {
       const clone = { ...r };
       clone.id = _genId();
       clone._created = new Date().toISOString();
       list.push(clone);
+      added.push(clone);
     });
     _set(KEYS[type], list);
+    if (typeof Sync !== 'undefined') Sync.pushBulkAdd(type, added);
   }
 
   // ---------- CATEGORIES ----------
@@ -292,13 +361,22 @@ const Store = (() => {
   }
 
   function parseCurrency(val) {
-    if (typeof val === 'number') return val;
+    if (typeof val === 'number') return Math.round(val);
     if (!val) return 0;
-    return parseInt(String(val).replace(/[^0-9-]/g, '')) || 0;
+    const str = String(val).trim();
+    // A single dot means float decimal notation (e.g. "29666.666666666667" from Supabase
+    // numeric columns or importer). Stripping the dot would inflate the value by ~10^N.
+    const dotCount = (str.match(/\./g) || []).length;
+    if (dotCount === 1) {
+      return Math.round(parseFloat(str.replace(/[^0-9.-]/g, '')) || 0);
+    }
+    // No dots (plain integer) or multiple dots (Chilean thousands separator "1.234.567"):
+    // strip non-digit chars and parse.
+    return parseInt(str.replace(/[^0-9-]/g, '')) || 0;
   }
 
   return {
-    init, getAll, add, update, remove, bulkAdd,
+    init, getAll, add, update, remove, clearAll, bulkAdd,
     getCategories, addCategory, removeCategory, renameCategory,
     getSavingsCategories, addSavingsCategory, removeSavingsCategory, renameSavingsCategory,
     getExpenseTypes, getPaymentMethods, getAccountTypes,

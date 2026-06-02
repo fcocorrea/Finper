@@ -264,45 +264,34 @@ const Dashboard = (() => {
     }).reduce((sum, e) => sum + Store.parseCurrency(e.gasto), 0);
   }
 
-  // ---------- LINE CHART: INCOME vs EXPENSES ----------
+  // ---------- BAR CHART: INCOME vs EXPENSES (selected month) ----------
   function renderLineChart(month, year) {
     const ctx = document.getElementById('chart-line');
     if (!ctx) return;
 
-    const labels = [];
-    const incomeData = [];
-    const expenseData = [];
-
-    // Last 6 months including selected
-    for (let i = 5; i >= 0; i--) {
-      let m = month - i, y = year;
-      while (m < 1) { m += 12; y--; }
-      labels.push(UI.getMonthLabel(m, y));
-      incomeData.push(Store.getTotalIncome(m, y));
-      expenseData.push(Store.getTotalExpenses(m, y));
-    }
+    const label = UI.getMonthLabel(month, year);
+    const income = Store.getTotalIncome(month, year);
+    const expense = Store.getTotalExpenses(month, year);
 
     if (lineChart) lineChart.destroy();
     lineChart = new Chart(ctx.getContext('2d'), {
-      type: 'line',
+      type: 'bar',
       data: {
-        labels,
+        labels: [label],
         datasets: [
           {
             label: 'Ingresos',
-            data: incomeData,
-            borderColor: '#10b981',
-            backgroundColor: 'rgba(16,185,129,0.1)',
-            fill: true, tension: 0.4, borderWidth: 2, pointRadius: 4,
-            pointBackgroundColor: '#10b981',
+            data: [income],
+            backgroundColor: '#10b981',
+            borderRadius: 6,
+            maxBarThickness: 60,
           },
           {
             label: 'Gastos',
-            data: expenseData,
-            borderColor: '#4a7cf7',
-            backgroundColor: 'rgba(74,124,247,0.1)',
-            fill: true, tension: 0.4, borderWidth: 2, pointRadius: 4,
-            pointBackgroundColor: '#4a7cf7',
+            data: [expense],
+            backgroundColor: '#4a7cf7',
+            borderRadius: 6,
+            maxBarThickness: 60,
           },
         ]
       },
@@ -326,6 +315,15 @@ const Dashboard = (() => {
         }
       }
     });
+
+    const remaining = income - expense;
+    const box = document.createElement('div');
+    box.className = `chart-balance ${remaining >= 0 ? 'positive' : 'negative'}`;
+    box.innerHTML = `
+      <span class="chart-balance-label">Disponible este mes</span>
+      <span class="chart-balance-value">${UI.formatCLP(remaining)}</span>
+    `;
+    ctx.parentElement.appendChild(box);
   }
 
   function renderIncomeLineChart(month, year) {

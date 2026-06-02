@@ -1,0 +1,10 @@
+# Carpetas de agentes y herramientas
+.agents/
+.claude/
+
+# Configuraciones locales y bloqueos
+.mcp.json
+skills-lock.json
+
+# Instrucciones específicas de Claude
+CLAUDE.md

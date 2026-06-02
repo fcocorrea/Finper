@@ -50,100 +50,220 @@ const Importer = (() => {
 
   function handleFile(file) {
     if (!file) return;
+
     const ext = file.name.split('.').pop().toLowerCase();
     if (!['csv', 'xlsx', 'xls'].includes(ext)) {
-      UI.toast('Solo se admiten archivos .csv o .xlsx', 'error');
+      UI.toast('Formato no válido. Solo se admiten archivos .csv o .xlsx', 'error');
       return;
     }
 
     const reader = new FileReader();
+
+    reader.onerror = () => {
+      _showError(
+        'No se pudo leer el archivo.',
+        'El archivo puede estar en uso por otro programa o estar dañado.'
+      );
+    };
+
     reader.onload = (e) => {
+      // ── 1. Parse workbook ──────────────────────────────────────────
+      let workbook;
       try {
-        const workbook = XLSX.read(e.target.result, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const sheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        workbook = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+      } catch (err) {
+        _showError(
+          'El archivo no pudo ser procesado como Excel o CSV.',
+          `Detalle técnico: ${err.message}`
+        );
+        return;
+      }
 
-        if (!jsonData.length) {
-          UI.toast('El archivo está vacío', 'warning');
-          return;
-        }
+      // ── 2. Extract rows ────────────────────────────────────────────
+      let jsonData;
+      try {
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+      } catch (err) {
+        _showError(
+          'No se pudo leer la hoja de datos del archivo.',
+          `Detalle técnico: ${err.message}`
+        );
+        return;
+      }
 
-        const dataType = document.getElementById('import-type').value;
-        const columns = Store.getColumns(dataType);
-        const fileHeaders = Object.keys(jsonData[0]);
+      if (!jsonData.length) {
+        _showError(
+          'El archivo no contiene datos.',
+          'Verifica que la primera fila tenga los encabezados de columna y que exista al menos un registro.'
+        );
+        return;
+      }
 
-        // Validate headers match
-        const colLabels = columns.map(c => c.label.toLowerCase().trim());
-        const matchedHeaders = {};
-        let mismatch = false;
+      // ── 3. Match headers ───────────────────────────────────────────
+      const dataType = document.getElementById('import-type').value;
+      const columns = Store.getColumns(dataType);
+      const fileHeaders = Object.keys(jsonData[0]);
+      const colLabels = columns.map(c => c.label.toLowerCase().trim());
 
-        fileHeaders.forEach(h => {
-          const normalized = h.toLowerCase().trim();
-          const colIdx = colLabels.findIndex(cl => cl === normalized);
-          if (colIdx >= 0) {
-            matchedHeaders[h] = columns[colIdx].key;
-          }
-        });
+      const matchedHeaders = {};
+      fileHeaders.forEach(h => {
+        const idx = colLabels.findIndex(cl => cl === h.toLowerCase().trim());
+        if (idx >= 0) matchedHeaders[h] = columns[idx].key;
+      });
 
-        if (Object.keys(matchedHeaders).length === 0) {
-          UI.toast('Los encabezados del archivo no coinciden con la configuración actual. Verifica que los nombres de las columnas sean iguales.', 'error');
-          return;
-        }
+      if (!Object.keys(matchedHeaders).length) {
+        _showError(
+          'Ningún encabezado del archivo coincide con las columnas configuradas.',
+          `<strong>Columnas esperadas:</strong> ${columns.map(c => c.label).join(', ')}<br>` +
+          `<strong>Columnas encontradas:</strong> ${fileHeaders.join(', ')}`
+        );
+        return;
+      }
 
-        // Map records
-        pendingRecords = jsonData.map(row => {
-          const record = {};
+      const unmatchedCols = columns
+        .filter(c => !Object.values(matchedHeaders).includes(c.key))
+        .map(c => c.label);
+
+      // ── 4. Map & validate rows ─────────────────────────────────────
+      const DMY = /^\d{2}-\d{2}-\d{2}$/;
+      const MY  = /^\d{2}-\d{2}$/;
+      const rowErrors = [];
+      const mapped = [];
+
+      jsonData.forEach((row, i) => {
+        const record = {};
+        let rowError = null;
+
+        try {
           Object.entries(matchedHeaders).forEach(([fileH, colKey]) => {
             let val = row[fileH];
             const col = columns.find(c => c.key === colKey);
-            // Adapt format
-            if (col && col.type === 'currency') {
+            if (!col) return;
+
+            if (col.type === 'currency') {
               val = Store.parseCurrency(val);
+            } else if (col.type === 'date-dmy') {
+              val = _toDateDMY(val);
+              if (!DMY.test(val)) {
+                throw new Error(`Fecha inválida en columna "${col.label}": "${row[fileH]}" — formato esperado dd-mm-aa`);
+              }
+            } else if (col.type === 'date-my') {
+              val = _toDateMY(val);
+              if (!MY.test(val)) {
+                throw new Error(`Fecha inválida en columna "${col.label}": "${row[fileH]}" — formato esperado mm-aa`);
+              }
             }
+
             record[colKey] = String(val);
           });
-          return record;
-        });
-
-        // Preview
-        const preview = document.getElementById('import-preview');
-        let html = `<p style="margin-bottom:var(--space-2);color:var(--color-accent);font-weight:600">${pendingRecords.length} registros detectados</p>`;
-        html += `<div class="table-wrapper" style="max-height:250px;overflow-y:auto"><table class="data-table"><thead><tr>`;
-        columns.forEach(c => { html += `<th>${c.label}</th>`; });
-        html += `</tr></thead><tbody>`;
-        pendingRecords.slice(0, 10).forEach(r => {
-          html += `<tr>`;
-          columns.forEach(c => {
-            html += `<td>${r[c.key] || ''}</td>`;
-          });
-          html += `</tr>`;
-        });
-        if (pendingRecords.length > 10) {
-          html += `<tr><td colspan="${columns.length}" style="text-align:center;color:var(--color-muted)">... y ${pendingRecords.length - 10} más</td></tr>`;
+        } catch (err) {
+          rowError = err.message;
         }
-        html += `</tbody></table></div>`;
-        preview.innerHTML = html;
 
-        const actions = document.getElementById('import-actions');
-        actions.classList.remove('hidden');
-        actions.style.display = 'flex';
+        if (rowError) {
+          rowErrors.push(`Fila ${i + 2}: ${rowError}`);
+        } else {
+          mapped.push(record);
+        }
+      });
 
-        document.getElementById('import-confirm').onclick = () => {
-          const type = document.getElementById('import-type').value;
-          Store.bulkAdd(type, pendingRecords);
-          UI.toast(`${pendingRecords.length} registros importados`, 'success');
-          pendingRecords = [];
-          UI.closeModal('modal-import');
-          App.refresh();
-        };
-
-      } catch (err) {
-        console.error(err);
-        UI.toast('Error al leer el archivo', 'error');
+      if (!mapped.length) {
+        _showError(
+          `Todos los registros (${jsonData.length}) contienen errores y no pueden importarse.`,
+          rowErrors.slice(0, 5).map(e => `• ${e}`).join('<br>') +
+          (rowErrors.length > 5 ? `<br>• ... y ${rowErrors.length - 5} errores más` : '')
+        );
+        return;
       }
+
+      pendingRecords = mapped;
+
+      // ── 5. Render preview ──────────────────────────────────────────
+      const preview = document.getElementById('import-preview');
+      let html = '';
+
+      if (rowErrors.length) {
+        html += `<div class="import-banner import-banner--warning">
+          <strong>${rowErrors.length} fila(s) con errores serán omitidas.</strong><br>
+          ${rowErrors.slice(0, 3).map(e => `• ${e}`).join('<br>')}
+          ${rowErrors.length > 3 ? `<br>• ... y ${rowErrors.length - 3} más` : ''}
+        </div>`;
+      }
+
+      if (unmatchedCols.length) {
+        html += `<div class="import-banner import-banner--warning">
+          <strong>Columnas no encontradas en el archivo (quedarán vacías):</strong> ${unmatchedCols.join(', ')}
+        </div>`;
+      }
+
+      html += `<p style="margin-bottom:var(--space-2);color:var(--color-accent);font-weight:600">${mapped.length} registros listos para importar</p>`;
+      html += `<div class="table-wrapper" style="max-height:250px;overflow-y:auto"><table class="data-table"><thead><tr>`;
+      columns.forEach(c => { html += `<th>${c.label}</th>`; });
+      html += `</tr></thead><tbody>`;
+      mapped.slice(0, 10).forEach(r => {
+        html += `<tr>`;
+        columns.forEach(c => { html += `<td>${r[c.key] || ''}</td>`; });
+        html += `</tr>`;
+      });
+      if (mapped.length > 10) {
+        html += `<tr><td colspan="${columns.length}" style="text-align:center;color:var(--color-muted)">... y ${mapped.length - 10} más</td></tr>`;
+      }
+      html += `</tbody></table></div>`;
+      preview.innerHTML = html;
+
+      const actions = document.getElementById('import-actions');
+      actions.classList.remove('hidden');
+      actions.style.display = 'flex';
+
+      document.getElementById('import-confirm').onclick = () => {
+        const type = document.getElementById('import-type').value;
+        Store.bulkAdd(type, pendingRecords);
+        UI.toast(`${pendingRecords.length} registros importados`, 'success');
+        pendingRecords = [];
+        UI.closeModal('modal-import');
+        App.refresh();
+      };
     };
+
     reader.readAsArrayBuffer(file);
+  }
+
+  function _showError(message, detail = '') {
+    const preview = document.getElementById('import-preview');
+    if (!preview) return;
+    preview.innerHTML = `
+      <div class="import-banner import-banner--error">
+        <strong>${message}</strong>
+        ${detail ? `<div style="margin-top:var(--space-2);line-height:1.7">${detail}</div>` : ''}
+      </div>
+    `;
+    const actions = document.getElementById('import-actions');
+    if (actions) actions.classList.add('hidden');
+    pendingRecords = [];
+  }
+
+  function _parseToDate(val) {
+    if (val instanceof Date) return val;
+    if (typeof val === 'number') return new Date((val - 25569) * 86400 * 1000);
+    return null;
+  }
+
+  function _toDateDMY(val) {
+    const d = _parseToDate(val);
+    if (!d) return String(val);
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const yy = String(d.getUTCFullYear()).slice(-2);
+    return `${dd}-${mm}-${yy}`;
+  }
+
+  function _toDateMY(val) {
+    const d = _parseToDate(val);
+    if (!d) return String(val);
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const yy = String(d.getUTCFullYear()).slice(-2);
+    return `${mm}-${yy}`;
   }
 
   return { open };

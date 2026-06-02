@@ -53,7 +53,9 @@ const UI = (() => {
 
   // ---------- FORMAT ----------
   function formatCLP(amount) {
-    const num = typeof amount === 'number' ? amount : parseInt(String(amount).replace(/[^0-9-]/g, '')) || 0;
+    const num = typeof amount === 'number'
+      ? Math.round(amount)
+      : parseInt(String(amount).replace(/[^0-9-]/g, '')) || 0;
     return '$' + num.toLocaleString('es-CL');
   }
 

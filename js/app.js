@@ -71,7 +71,18 @@ const App = (() => {
       Editor.open('savings');
     });
 
-    document.getElementById('btn-import').addEventListener('click', () => Importer.open());
+    document.getElementById('dropdown-archivo-importar').addEventListener('click', (e) => {
+      e.preventDefault();
+      Archivo.openImport();
+    });
+    document.getElementById('dropdown-archivo-descargar').addEventListener('click', (e) => {
+      e.preventDefault();
+      Archivo.openDownload();
+    });
+    document.getElementById('dropdown-archivo-eliminar').addEventListener('click', (e) => {
+      e.preventDefault();
+      Archivo.openDelete();
+    });
   }
 
   // ---------- TOOLBAR ----------
