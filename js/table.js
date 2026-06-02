@@ -131,7 +131,7 @@ const TableView = (() => {
       totals[cat] = (totals[cat] || 0) + Store.parseCurrency(e.gasto);
     });
 
-    const usedCategories = categories.filter(c => totals[c] > 0);
+    const usedCategories = categories.filter(c => totals[c] > 0).sort((a, b) => totals[b] - totals[a]);
     if (!usedCategories.length) { container.innerHTML = emptyPivot(); return; }
 
     let grandTotal = 0;
@@ -165,7 +165,7 @@ const TableView = (() => {
     let html = `<div class="table-wrapper fade-in"><table class="data-table pivot-table">
       <thead><tr><th>Fuente</th><th>${monthLabel}</th></tr></thead><tbody>`;
 
-    Object.entries(sourceMap).forEach(([src, v]) => {
+    Object.entries(sourceMap).sort((a, b) => b[1] - a[1]).forEach(([src, v]) => {
       grandTotal += v;
       html += `<tr><td><strong>${src}</strong></td><td class="pivot-cell-value">${UI.formatCLP(v)}</td></tr>`;
     });
@@ -186,7 +186,7 @@ const TableView = (() => {
       totals[cat] = (totals[cat] || 0) + Store.parseCurrency(r.monto);
     });
 
-    const usedCategories = categories.filter(c => totals[c] > 0);
+    const usedCategories = categories.filter(c => totals[c] > 0).sort((a, b) => totals[b] - totals[a]);
     if (!usedCategories.length) { container.innerHTML = emptyPivot(); return; }
 
     let grandTotal = 0;

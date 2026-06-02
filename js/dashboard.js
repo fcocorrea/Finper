@@ -35,7 +35,7 @@ const Dashboard = (() => {
     if (prevMonth < 1) { prevMonth = 12; prevYear--; }
     const prevExpenses = getExpensesToDay(prevMonth, prevYear, currentDay);
     const currentExpenses = getExpensesToDay(month, year, currentDay);
-    const comparison = prevExpenses > 0 ? ((currentExpenses / prevExpenses) * 100).toFixed(1) : 0;
+    const comparison = prevExpenses > 0 ? (((currentExpenses - prevExpenses) / prevExpenses) * 100).toFixed(1) : 0;
 
     container.innerHTML = `
       <div class="metrics-grid fade-in">
@@ -51,7 +51,7 @@ const Dashboard = (() => {
         </div>
         <div class="metric-card success">
           <div class="metric-label">vs. Mes Anterior (día ${currentDay})</div>
-          <div class="metric-value ${comparison > 100 ? 'negative' : 'positive'}">${comparison}%</div>
+          <div class="metric-value ${comparison > 0 ? 'negative' : 'positive'}">${comparison}%</div>
           <div class="metric-detail">${UI.formatCLP(currentExpenses)} vs ${UI.formatCLP(prevExpenses)}</div>
         </div>
       </div>
