@@ -178,6 +178,21 @@ const Sync = (() => {
     savings:  { table: 'ahorros',                  toDB: _savingsToDB, toApp: _rowToSavings },
   };
 
+  // ── Ensure categories exist in Supabase ──────────────────────
+
+  async function _ensureCategories(names) {
+    const missing = [...new Set(names)].filter(n => n && !_catMap[n]);
+    if (!missing.length) return;
+
+    const { data, error } = await _db
+      .from('categorias_gastos')
+      .insert(missing.map(nombre => ({ nombre })))
+      .select('id, nombre');
+
+    if (error) { console.error('[Sync] _ensureCategories:', error.message); return; }
+    data.forEach(c => { _catMap[c.nombre] = c.id; _catById[c.id] = c.nombre; });
+  }
+
   // ── ID generator (for pulled records) ────────────────────────
 
   let _seq = 0;
@@ -246,6 +261,7 @@ const Sync = (() => {
     if (!_db) return;
     const mapping = _TABLES[type];
     if (!mapping) return;
+    if (type === 'expenses') await _ensureCategories([record.categoria]);
     const payload = mapping.toDB(record);
     if (!payload) return;
 
@@ -293,6 +309,8 @@ const Sync = (() => {
     if (!_db || !records.length) return;
     const mapping = _TABLES[type];
     if (!mapping) return;
+
+    if (type === 'expenses') await _ensureCategories(records.map(r => r.categoria));
 
     const payloads = records.map(r => mapping.toDB(r)).filter(Boolean);
     if (!payloads.length) return;
