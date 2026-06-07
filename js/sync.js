@@ -127,7 +127,9 @@ const Sync = (() => {
   function _expenseToDB(r) {
     const catId = _catMap[r.categoria];
     if (!catId) return null;
+    const userId = Auth.getCurrentUserId();
     return {
+      user_id:      userId,
       fecha:        _dmyToISO(r.fecha),
       mes_pago:     r.mesPago,
       categoria_id: catId,
@@ -141,7 +143,9 @@ const Sync = (() => {
   }
 
   function _incomeToDB(r) {
+    const userId = Auth.getCurrentUserId();
     return {
+      user_id:     userId,
       fecha:       _myToISO(r.fecha),
       mes_periodo: r.fecha,
       monto:       Store.parseCurrency(r.monto),
@@ -150,7 +154,9 @@ const Sync = (() => {
   }
 
   function _accountToDB(r) {
+    const userId = Auth.getCurrentUserId();
     return {
+      user_id:     userId,
       fecha:       _dmyToISO(r.fecha),
       persona:     r.persona     || '',
       descripcion: r.descripcion || null,
@@ -161,7 +167,9 @@ const Sync = (() => {
 
   function _savingsToDB(r) {
     if (!r.fecha) return null;
+    const userId = Auth.getCurrentUserId();
     return {
+      user_id:     userId,
       fecha:       _dmyToISO(r.fecha),
       mes_pago:    r.mesPago     || null,
       categoria:   r.categoria   || null,
@@ -184,9 +192,10 @@ const Sync = (() => {
     const missing = [...new Set(names)].filter(n => n && !_catMap[n]);
     if (!missing.length) return;
 
+    const userId = Auth.getCurrentUserId();
     const { data, error } = await _db
       .from('categorias_gastos')
-      .insert(missing.map(nombre => ({ nombre })))
+      .insert(missing.map(nombre => ({ nombre, user_id: userId })))
       .select('id, nombre');
 
     if (error) { console.error('[Sync] _ensureCategories:', error.message); return; }

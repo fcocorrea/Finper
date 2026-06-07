@@ -468,4 +468,14 @@ const App = (() => {
 })();
 
 // Boot
-document.addEventListener('DOMContentLoaded', () => App.init());
+document.addEventListener('DOMContentLoaded', async () => {
+  Auth.init();
+  const user = await Auth.checkSession();
+  if (user) {
+    Auth.hideAuthView();
+    App.init();
+  } else {
+    Auth.showAuthView();
+    Auth.renderLoginForm();
+  }
+});
