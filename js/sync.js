@@ -193,13 +193,28 @@ const Sync = (() => {
     if (!missing.length) return;
 
     const userId = Auth.getCurrentUserId();
-    const { data, error } = await _db
+
+    // Insert new ones — ignore errors (e.g. duplicate key if category already exists)
+    const { data: inserted } = await _db
       .from('categorias_gastos')
       .insert(missing.map(nombre => ({ nombre, user_id: userId })))
       .select('id, nombre');
 
-    if (error) { console.error('[Sync] _ensureCategories:', error.message); return; }
-    data.forEach(c => { _catMap[c.nombre] = c.id; _catById[c.id] = c.nombre; });
+    if (inserted?.length) {
+      inserted.forEach(c => { _catMap[c.nombre] = c.id; _catById[c.id] = c.nombre; });
+    }
+
+    // Re-fetch any that are still unmapped (they already existed in Supabase)
+    const stillMissing = missing.filter(n => !_catMap[n]);
+    if (stillMissing.length) {
+      const { data: existing } = await _db
+        .from('categorias_gastos')
+        .select('id, nombre')
+        .in('nombre', stillMissing);
+      if (existing?.length) {
+        existing.forEach(c => { _catMap[c.nombre] = c.id; _catById[c.id] = c.nombre; });
+      }
+    }
   }
 
   // ── ID generator (for pulled records) ────────────────────────
@@ -207,6 +222,18 @@ const Sync = (() => {
   let _seq = 0;
   function _newId() {
     return Date.now().toString(36) + (++_seq).toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  // ── Merge helper ─────────────────────────────────────────────
+  // Replaces confirmed records with fresh Supabase data while
+  // preserving local-only records (no _supabase_id) that haven't
+  // been pushed yet — so a failed or in-flight push never causes
+  // data loss on the next pull.
+
+  function _mergeIntoStorage(key, supabaseRecords) {
+    const local = JSON.parse(localStorage.getItem(key) || '[]');
+    const pending = local.filter(r => !r._supabase_id);
+    localStorage.setItem(key, JSON.stringify([...supabaseRecords, ...pending]));
   }
 
   // ── Pull: Supabase → localStorage ────────────────────────────
@@ -228,33 +255,29 @@ const Sync = (() => {
       if (expRes.error) {
         ok = false;
         console.error('[Sync] pull expenses:', expRes.error.message);
-      } else if (expRes.data.length > 0) {
-        localStorage.setItem('finper_expenses',
-          JSON.stringify(expRes.data.map(r => ({ id: _newId(), ..._rowToExpense(r) }))));
+      } else {
+        _mergeIntoStorage('finper_expenses', expRes.data.map(r => ({ id: _newId(), ..._rowToExpense(r) })));
       }
 
       if (incRes.error) {
         ok = false;
         console.error('[Sync] pull incomes:', incRes.error.message);
-      } else if (incRes.data.length > 0) {
-        localStorage.setItem('finper_incomes',
-          JSON.stringify(incRes.data.map(r => ({ id: _newId(), ..._rowToIncome(r) }))));
+      } else {
+        _mergeIntoStorage('finper_incomes', incRes.data.map(r => ({ id: _newId(), ..._rowToIncome(r) })));
       }
 
       if (accRes.error) {
         ok = false;
         console.error('[Sync] pull accounts:', accRes.error.message);
-      } else if (accRes.data.length > 0) {
-        localStorage.setItem('finper_accounts',
-          JSON.stringify(accRes.data.map(r => ({ id: _newId(), ..._rowToAccount(r) }))));
+      } else {
+        _mergeIntoStorage('finper_accounts', accRes.data.map(r => ({ id: _newId(), ..._rowToAccount(r) })));
       }
 
       if (savRes.error) {
         ok = false;
         console.error('[Sync] pull savings:', savRes.error.message);
-      } else if (savRes.data.length > 0) {
-        localStorage.setItem('finper_savings',
-          JSON.stringify(savRes.data.map(r => ({ id: _newId(), ..._rowToSavings(r) }))));
+      } else {
+        _mergeIntoStorage('finper_savings', savRes.data.map(r => ({ id: _newId(), ..._rowToSavings(r) })));
       }
 
       return ok;

@@ -1192,7 +1192,6 @@ body {
   display: none;
   min-height: 100vh;
   background: var(--gradient-light);
-  display: flex;
   align-items: center;
   justify-content: center;
   padding: var(--space-4);

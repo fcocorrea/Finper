@@ -99,13 +99,9 @@ const Store = (() => {
 
     if (typeof Sync !== 'undefined') {
       Sync.init();
-      Sync.pull().then(ok => {
-        if (typeof App !== 'undefined') {
-          UI.toast(ok ? 'Sincronizado con la nube ☁' : 'Sin conexión — datos locales', ok ? 'success' : 'warning');
-          App.refresh();
-        }
-      });
+      return Sync.pull();
     }
+    return Promise.resolve(true);
   }
 
   function _migrateExpensesToSavings() {

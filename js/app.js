@@ -8,11 +8,15 @@ const App = (() => {
     year: new Date().getFullYear(),
   };
 
-  function init() {
-    Store.init();
+  let _initialized = false;
+
+  async function init() {
+    if (_initialized) return;
+    _initialized = true;
     bindNavbar();
     bindToolbar();
     bindCloseModals();
+    await Store.init();
     refresh();
   }
 
