@@ -2,23 +2,33 @@
 
 const TableView = (() => {
 
-  function render(dataType, month, year) {
+  function render(dataType, month, year, drillFilter = null) {
     const container = document.getElementById('view-table');
     const columns = Store.getColumns(dataType);
-    const data = (dataType === 'accounts')
+    let data = (dataType === 'accounts')
       ? Store.getAll(dataType)
       : Store.getByMonth(dataType, month, year);
 
+    if (drillFilter) {
+      data = data.filter(row => row[drillFilter.key] === drillFilter.value);
+    }
+
     if (!data.length) {
       container.innerHTML = `
+        ${drillFilter ? renderDrillBadge(drillFilter) : ''}
         <div class="empty-state fade-in">
           <div class="empty-state-text">No hay datos registrados</div>
           <div class="empty-state-hint">Usa el botón "Añadir" para comenzar a registrar</div>
         </div>`;
+      if (drillFilter) {
+        container.querySelector('#clear-drill-filter')
+          .addEventListener('click', () => App.clearDrillFilter());
+      }
       return;
     }
 
-    let html = `<div class="table-wrapper fade-in"><table class="data-table" id="data-table">
+    let html = (drillFilter ? renderDrillBadge(drillFilter) : '') +
+      `<div class="table-wrapper fade-in"><table class="data-table" id="data-table">
       <thead><tr>`;
     columns.forEach(col => { html += `<th>${col.label}</th>`; });
     html += `<th style="width:70px"></th></tr></thead><tbody>`;
@@ -40,6 +50,11 @@ const TableView = (() => {
 
     html += `</tbody></table></div>`;
     container.innerHTML = html;
+
+    if (drillFilter) {
+      container.querySelector('#clear-drill-filter')
+        .addEventListener('click', () => App.clearDrillFilter());
+    }
 
     // Event delegation
     container.querySelector('#data-table').addEventListener('click', async (e) => {
@@ -105,6 +120,13 @@ const TableView = (() => {
     UI.openModal('modal-edit-row');
   }
 
+  function renderDrillBadge(drillFilter) {
+    return `<div class="drill-filter-badge">
+      Filtro activo: <strong>${drillFilter.value}</strong>
+      <button class="btn-icon btn-ghost" id="clear-drill-filter" title="Quitar filtro">✕</button>
+    </div>`;
+  }
+
   // ---------- PIVOT TABLE ----------
   function renderPivot(dataType, month, year) {
     const container = document.getElementById('view-pivot');
@@ -141,12 +163,20 @@ const TableView = (() => {
     usedCategories.forEach(c => {
       const v = totals[c];
       grandTotal += v;
-      html += `<tr><td><strong>${c}</strong></td><td class="pivot-cell-value">${UI.formatCLP(v)}</td></tr>`;
+      html += `<tr>
+        <td class="pivot-drillable" data-drill-key="categoria" data-drill-value="${c}"><strong>${c}</strong></td>
+        <td class="pivot-cell-value">${UI.formatCLP(v)}</td>
+      </tr>`;
     });
 
     html += `<tr class="pivot-total"><td><strong>Total</strong></td><td class="pivot-cell-value">${UI.formatCLP(grandTotal)}</td></tr>`;
     html += `</tbody></table></div>`;
     container.innerHTML = html;
+
+    container.querySelector('.pivot-table').addEventListener('click', (e) => {
+      const cell = e.target.closest('.pivot-drillable');
+      if (cell) App.drillDown(cell.dataset.drillKey, cell.dataset.drillValue);
+    });
   }
 
   function renderIncomePivot(container, month, year) {
@@ -167,12 +197,20 @@ const TableView = (() => {
 
     Object.entries(sourceMap).sort((a, b) => b[1] - a[1]).forEach(([src, v]) => {
       grandTotal += v;
-      html += `<tr><td><strong>${src}</strong></td><td class="pivot-cell-value">${UI.formatCLP(v)}</td></tr>`;
+      html += `<tr>
+        <td class="pivot-drillable" data-drill-key="fuente" data-drill-value="${src}"><strong>${src}</strong></td>
+        <td class="pivot-cell-value">${UI.formatCLP(v)}</td>
+      </tr>`;
     });
 
     html += `<tr class="pivot-total"><td><strong>Total</strong></td><td class="pivot-cell-value">${UI.formatCLP(grandTotal)}</td></tr>`;
     html += `</tbody></table></div>`;
     container.innerHTML = html;
+
+    container.querySelector('.pivot-table').addEventListener('click', (e) => {
+      const cell = e.target.closest('.pivot-drillable');
+      if (cell) App.drillDown(cell.dataset.drillKey, cell.dataset.drillValue);
+    });
   }
 
   function renderSavingsPivot(container, month, year) {
@@ -196,12 +234,20 @@ const TableView = (() => {
     usedCategories.forEach(c => {
       const v = totals[c];
       grandTotal += v;
-      html += `<tr><td><strong>${c}</strong></td><td class="pivot-cell-value">${UI.formatCLP(v)}</td></tr>`;
+      html += `<tr>
+        <td class="pivot-drillable" data-drill-key="categoria" data-drill-value="${c}"><strong>${c}</strong></td>
+        <td class="pivot-cell-value">${UI.formatCLP(v)}</td>
+      </tr>`;
     });
 
     html += `<tr class="pivot-total"><td><strong>Total</strong></td><td class="pivot-cell-value">${UI.formatCLP(grandTotal)}</td></tr>`;
     html += `</tbody></table></div>`;
     container.innerHTML = html;
+
+    container.querySelector('.pivot-table').addEventListener('click', (e) => {
+      const cell = e.target.closest('.pivot-drillable');
+      if (cell) App.drillDown(cell.dataset.drillKey, cell.dataset.drillValue);
+    });
   }
 
   function renderAccountPivot(container) {
@@ -222,13 +268,18 @@ const TableView = (() => {
     Object.entries(pivot).sort((a, b) => b[1] - a[1]).forEach(([key, total]) => {
       const [persona, tipo] = key.split('|||');
       html += `<tr>
-        <td><strong>${persona}</strong></td>
+        <td class="pivot-drillable" data-drill-key="persona" data-drill-value="${persona}"><strong>${persona}</strong></td>
         <td><span class="badge ${tipo === 'Cuentas por cobrar' ? 'badge-success' : 'badge-primary'}">${tipo}</span></td>
         <td class="pivot-cell-value">${UI.formatCLP(total)}</td>
       </tr>`;
     });
     html += `</tbody></table></div>`;
     container.innerHTML = html;
+
+    container.querySelector('.pivot-table').addEventListener('click', (e) => {
+      const cell = e.target.closest('.pivot-drillable');
+      if (cell) App.drillDown(cell.dataset.drillKey, cell.dataset.drillValue);
+    });
   }
 
   function emptyPivot() {

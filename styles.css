@@ -516,6 +516,38 @@ body {
   background: rgba(74, 124, 247, 0.08) !important;
 }
 
+.pivot-drillable {
+  cursor: pointer;
+}
+
+.pivot-drillable:hover strong {
+  text-decoration: underline;
+  color: var(--color-primary);
+}
+
+.drill-filter-badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-primary);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-3);
+}
+
+.drill-filter-badge #clear-drill-filter {
+  color: #fff;
+  opacity: 0.8;
+  font-size: var(--text-base);
+  line-height: 1;
+}
+
+.drill-filter-badge #clear-drill-filter:hover {
+  opacity: 1;
+}
+
 /* ===== FORMS / INPUTS ===== */
 .form-group {
   display: flex;

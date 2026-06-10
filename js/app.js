@@ -6,6 +6,7 @@ const App = (() => {
     viewMode: 'dashboard',
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
+    drillFilter: null,
   };
 
   let _initialized = false;
@@ -29,7 +30,7 @@ const App = (() => {
     document.getElementById('view-pivot').classList.toggle('hidden', viewMode !== 'pivot');
 
     if (viewMode === 'dashboard') Dashboard.render(dataType, month, year);
-    else if (viewMode === 'table') TableView.render(dataType, month, year);
+    else if (viewMode === 'table') TableView.render(dataType, month, year, state.drillFilter);
     else if (viewMode === 'pivot') TableView.renderPivot(dataType, month, year);
   }
 
@@ -97,6 +98,7 @@ const App = (() => {
         document.querySelectorAll('#data-type-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         state.dataType = btn.dataset.type;
+        state.drillFilter = null;
         refresh();
       });
     });
@@ -107,6 +109,7 @@ const App = (() => {
         document.querySelectorAll('#view-mode-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         state.viewMode = btn.dataset.view;
+        state.drillFilter = null;
         refresh();
       });
     });
@@ -115,11 +118,13 @@ const App = (() => {
     document.getElementById('month-prev').addEventListener('click', () => {
       state.month--;
       if (state.month < 1) { state.month = 12; state.year--; }
+      state.drillFilter = null;
       refresh();
     });
     document.getElementById('month-next').addEventListener('click', () => {
       state.month++;
       if (state.month > 12) { state.month = 1; state.year++; }
+      state.drillFilter = null;
       refresh();
     });
   }
@@ -452,6 +457,21 @@ const App = (() => {
     }
   }
 
+  // ---------- DRILL DOWN ----------
+  function drillDown(key, value) {
+    state.drillFilter = { key, value };
+    state.viewMode = 'table';
+    document.querySelectorAll('#view-mode-toggle .toggle-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.view === 'table');
+    });
+    refresh();
+  }
+
+  function clearDrillFilter() {
+    state.drillFilter = null;
+    refresh();
+  }
+
   // ---------- CLOSE MODALS ----------
   function bindCloseModals() {
     document.querySelectorAll('.modal-close').forEach(btn => {
@@ -468,7 +488,7 @@ const App = (() => {
     });
   }
 
-  return { init, refresh };
+  return { init, refresh, drillDown, clearDrillFilter };
 })();
 
 // Boot
