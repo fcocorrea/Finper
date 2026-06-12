@@ -476,32 +476,86 @@ body {
   white-space: nowrap;
 }
 
-.data-table tbody tr {
+.th-sort {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  margin-bottom: var(--space-2);
+}
+
+.th-sort:hover {
+  color: var(--color-primary);
+}
+
+.sort-indicator {
+  font-size: 10px;
+  color: var(--color-border);
+  flex-shrink: 0;
+}
+
+.sort-indicator.active {
+  color: var(--color-primary);
+}
+
+.col-filter {
+  display: block;
+  width: 100%;
+  font-size: var(--text-xs);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-family);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  min-width: 60px;
+}
+
+.col-filter:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(74, 124, 247, 0.15);
+}
+
+.col-filter::placeholder {
+  color: var(--color-border);
+  font-style: italic;
+}
+
+.table-no-results {
+  text-align: center;
+  color: var(--color-muted);
+  padding: var(--space-8) !important;
+  font-style: italic;
+  font-size: var(--text-sm);
+  white-space: normal !important;
+}
+
+.data-table tbody tr.data-row {
+  cursor: pointer;
   transition: background var(--transition-fast);
 }
 
-.data-table tbody tr:hover {
-  background: rgba(74, 124, 247, 0.06);
-}
-
-.data-table tbody tr:hover .row-actions {
-  opacity: 1;
-}
-
-.row-actions {
-  display: flex;
-  gap: var(--space-1);
-  opacity: 0;
-  transition: opacity var(--transition-fast);
-}
-
-.row-actions .btn-icon {
-  width: 30px;
-  height: 30px;
-  font-size: var(--text-sm);
+.data-table tbody tr.data-row:hover {
+  background: rgba(74, 124, 247, 0.08);
 }
 
 /* Pivot table */
+.pivot-table tbody tr {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.pivot-table tbody tr:hover {
+  background: rgba(74, 124, 247, 0.08);
+}
+
 .pivot-table th {
   background: var(--color-surface-2);
 }
@@ -743,6 +797,10 @@ body {
   margin-top: var(--space-6);
   padding-top: var(--space-4);
   border-top: 1px solid var(--color-border);
+}
+
+.modal-footer #edit-row-delete {
+  margin-right: auto;
 }
 
 /* Type selector in modal */

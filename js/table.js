@@ -2,7 +2,73 @@
 
 const TableView = (() => {
 
+  let _sortKey = null;
+  let _sortDir = 'asc';
+  let _filters = {};
+  let _lastCtx = null;
+  let _lastFocusedCol = null;
+
+  function _resetTableState() {
+    _sortKey = null;
+    _sortDir = 'asc';
+    _filters = {};
+    _lastFocusedCol = null;
+  }
+
+  function _parseDateDMY(str) {
+    if (!str) return 0;
+    const p = str.split('-');
+    if (p.length !== 3) return 0;
+    return parseInt(p[2]) * 10000 + parseInt(p[1]) * 100 + parseInt(p[0]);
+  }
+
+  function _parseDateMY(str) {
+    if (!str) return 0;
+    const p = str.split('-');
+    if (p.length !== 2) return 0;
+    return parseInt(p[1]) * 100 + parseInt(p[0]);
+  }
+
+  function _applyFilters(data, columns) {
+    return data.filter(row =>
+      columns.every(col => {
+        const term = (_filters[col.key] || '').trim().toLowerCase();
+        if (!term) return true;
+        let display = row[col.key] || '';
+        if (col.type === 'currency') display = UI.formatCLP(display);
+        return String(display).toLowerCase().includes(term);
+      })
+    );
+  }
+
+  function _applySort(data, columns) {
+    if (!_sortKey) return data;
+    const col = columns.find(c => c.key === _sortKey);
+    if (!col) return data;
+    return [...data].sort((a, b) => {
+      const aVal = a[_sortKey] || '';
+      const bVal = b[_sortKey] || '';
+      let cmp;
+      if (col.type === 'currency') {
+        cmp = Store.parseCurrency(aVal) - Store.parseCurrency(bVal);
+      } else if (col.type === 'date-dmy') {
+        cmp = _parseDateDMY(aVal) - _parseDateDMY(bVal);
+      } else if (col.type === 'date-my') {
+        cmp = _parseDateMY(aVal) - _parseDateMY(bVal);
+      } else {
+        cmp = String(aVal).localeCompare(String(bVal), 'es');
+      }
+      return _sortDir === 'asc' ? cmp : -cmp;
+    });
+  }
+
   function render(dataType, month, year, drillFilter = null) {
+    const ctx = `${dataType}|${month}|${year}`;
+    if (ctx !== _lastCtx) {
+      _resetTableState();
+      _lastCtx = ctx;
+    }
+
     const container = document.getElementById('view-table');
     const columns = Store.getColumns(dataType);
     let data = (dataType === 'accounts')
@@ -27,26 +93,41 @@ const TableView = (() => {
       return;
     }
 
-    let html = (drillFilter ? renderDrillBadge(drillFilter) : '') +
-      `<div class="table-wrapper fade-in"><table class="data-table" id="data-table">
-      <thead><tr>`;
-    columns.forEach(col => { html += `<th>${col.label}</th>`; });
-    html += `<th style="width:70px"></th></tr></thead><tbody>`;
+    const filtered = _applyFilters(data, columns);
+    const sorted = _applySort(filtered, columns);
+    const hasActiveState = _sortKey !== null || Object.values(_filters).some(v => v.trim());
 
-    data.forEach(row => {
-      html += `<tr data-id="${row.id}">`;
-      columns.forEach(col => {
-        let val = row[col.key] || '';
-        if (col.type === 'currency') val = UI.formatCLP(val);
-        html += `<td>${val}</td>`;
-      });
-      html += `<td>
-        <div class="row-actions">
-          <button class="btn-icon btn-ghost row-edit" title="Editar" style="width:auto;padding:0 var(--space-2);font-size:var(--text-xs)">Editar</button>
-          <button class="btn-icon btn-ghost row-delete" title="Eliminar" style="width:auto;padding:0 var(--space-2);font-size:var(--text-xs)">Eliminar</button>
-        </div>
-      </td></tr>`;
+    let html = (drillFilter ? renderDrillBadge(drillFilter) : '') +
+      `<div class="${hasActiveState ? 'table-wrapper' : 'table-wrapper fade-in'}">` +
+      `<table class="data-table" id="data-table"><thead><tr>`;
+
+    columns.forEach(col => {
+      const isActive = _sortKey === col.key;
+      const indicator = isActive
+        ? `<span class="sort-indicator active">${_sortDir === 'asc' ? '▲' : '▼'}</span>`
+        : `<span class="sort-indicator">⇅</span>`;
+      const filterVal = (_filters[col.key] || '').replace(/"/g, '&quot;');
+      html += `<th data-col-key="${col.key}">
+        <div class="th-sort">${col.label}${indicator}</div>
+        <input class="col-filter" data-col-key="${col.key}" placeholder="Filtrar..." value="${filterVal}" />
+      </th>`;
     });
+
+    html += `</tr></thead><tbody>`;
+
+    if (!sorted.length) {
+      html += `<tr><td colspan="${columns.length}" class="table-no-results">Sin resultados para los filtros aplicados</td></tr>`;
+    } else {
+      sorted.forEach(row => {
+        html += `<tr class="data-row" data-id="${row.id}">`;
+        columns.forEach(col => {
+          let val = row[col.key] || '';
+          if (col.type === 'currency') val = UI.formatCLP(val);
+          html += `<td>${val}</td>`;
+        });
+        html += `</tr>`;
+      });
+    }
 
     html += `</tbody></table></div>`;
     container.innerHTML = html;
@@ -56,24 +137,33 @@ const TableView = (() => {
         .addEventListener('click', () => App.clearDrillFilter());
     }
 
-    // Event delegation
-    container.querySelector('#data-table').addEventListener('click', async (e) => {
-      const row = e.target.closest('tr');
+    if (_lastFocusedCol) {
+      const inp = container.querySelector(`.col-filter[data-col-key="${_lastFocusedCol}"]`);
+      if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+    }
+
+    container.querySelectorAll('th[data-col-key] .th-sort').forEach(sortDiv => {
+      sortDiv.addEventListener('click', () => {
+        const key = sortDiv.closest('th').dataset.colKey;
+        _sortKey === key ? (_sortDir = _sortDir === 'asc' ? 'desc' : 'asc') : (_sortKey = key, _sortDir = 'asc');
+        _lastFocusedCol = null;
+        render(dataType, month, year, drillFilter);
+      });
+    });
+
+    container.querySelectorAll('.col-filter').forEach(input => {
+      input.addEventListener('input', () => {
+        _filters[input.dataset.colKey] = input.value;
+        _lastFocusedCol = input.dataset.colKey;
+        render(dataType, month, year, drillFilter);
+      });
+    });
+
+    container.querySelector('#data-table').addEventListener('click', (e) => {
+      if (e.target.classList.contains('col-filter')) return;
+      const row = e.target.closest('tr[data-id]');
       if (!row) return;
-      const id = row.dataset.id;
-
-      if (e.target.closest('.row-delete')) {
-        const ok = await UI.confirm('Eliminar registro', '¿Estás seguro de que deseas eliminar esta fila? Esta acción no se puede deshacer.');
-        if (ok) {
-          Store.remove(dataType, id);
-          UI.toast('Registro eliminado', 'success');
-          App.refresh();
-        }
-      }
-
-      if (e.target.closest('.row-edit')) {
-        openEditRow(dataType, id);
-      }
+      openEditRow(dataType, row.dataset.id);
     });
   }
 
@@ -107,6 +197,7 @@ const TableView = (() => {
 
     const modal = document.getElementById('modal-edit-row');
     document.getElementById('edit-row-form').innerHTML = formHTML;
+
     document.getElementById('edit-row-save').onclick = () => {
       const updates = {};
       modal.querySelectorAll('[data-key]').forEach(el => {
@@ -117,6 +208,17 @@ const TableView = (() => {
       UI.toast('Registro actualizado', 'success');
       App.refresh();
     };
+
+    document.getElementById('edit-row-delete').onclick = async () => {
+      const ok = await UI.confirm('Eliminar registro', '¿Estás seguro que deseas eliminar este registro? Esta acción no se puede deshacer.');
+      if (ok) {
+        Store.remove(dataType, id);
+        UI.closeModal('modal-edit-row');
+        UI.toast('Registro eliminado', 'success');
+        App.refresh();
+      }
+    };
+
     UI.openModal('modal-edit-row');
   }
 
