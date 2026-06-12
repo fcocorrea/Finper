@@ -303,6 +303,10 @@ const Store = (() => {
     return true;
   }
 
+  function getByMonths(type, months) {
+    return months.flatMap(({ month, year }) => getByMonth(type, month, year));
+  }
+
   function getByMonth(type, month, year) {
     const all = getAll(type);
     return all.filter(record => {
@@ -379,7 +383,7 @@ const Store = (() => {
     getColumns, setColumns,
     getIncomeSources, addIncomeSource,
     getSuggestions, predictCategory,
-    getByMonth, parseRecordDate,
+    getByMonths, getByMonth, parseRecordDate,
     getTotalIncome, getTotalExpenses, getTotalSavings, parseCurrency,
     DEFAULT_COLUMNS,
   };

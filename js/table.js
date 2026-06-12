@@ -62,8 +62,8 @@ const TableView = (() => {
     });
   }
 
-  function render(dataType, month, year, drillFilter = null) {
-    const ctx = `${dataType}|${month}|${year}`;
+  function render(dataType, months, drillFilter = null) {
+    const ctx = `${dataType}|${months.map(({month, year}) => `${month}-${year}`).join(',')}`;
     if (ctx !== _lastCtx) {
       _resetTableState();
       _lastCtx = ctx;
@@ -73,7 +73,7 @@ const TableView = (() => {
     const columns = Store.getColumns(dataType);
     let data = (dataType === 'accounts')
       ? Store.getAll(dataType)
-      : Store.getByMonth(dataType, month, year);
+      : Store.getByMonths(dataType, months);
 
     if (drillFilter) {
       data = data.filter(row => row[drillFilter.key] === drillFilter.value);
@@ -147,7 +147,7 @@ const TableView = (() => {
         const key = sortDiv.closest('th').dataset.colKey;
         _sortKey === key ? (_sortDir = _sortDir === 'asc' ? 'desc' : 'asc') : (_sortKey = key, _sortDir = 'asc');
         _lastFocusedCol = null;
-        render(dataType, month, year, drillFilter);
+        render(dataType, months, drillFilter);
       });
     });
 
@@ -155,7 +155,7 @@ const TableView = (() => {
       input.addEventListener('input', () => {
         _filters[input.dataset.colKey] = input.value;
         _lastFocusedCol = input.dataset.colKey;
-        render(dataType, month, year, drillFilter);
+        render(dataType, months, drillFilter);
       });
     });
 
@@ -230,126 +230,103 @@ const TableView = (() => {
   }
 
   // ---------- PIVOT TABLE ----------
-  function renderPivot(dataType, month, year) {
+  function renderPivot(dataType, months) {
     const container = document.getElementById('view-pivot');
-
-    if (dataType === 'expenses') {
-      renderExpensePivot(container, month, year);
-    } else if (dataType === 'incomes') {
-      renderIncomePivot(container, month, year);
-    } else if (dataType === 'savings') {
-      renderSavingsPivot(container, month, year);
-    } else {
-      renderAccountPivot(container);
-    }
+    if (dataType === 'expenses') renderExpensePivot(container, months);
+    else if (dataType === 'incomes') renderIncomePivot(container, months);
+    else if (dataType === 'savings') renderSavingsPivot(container, months);
+    else renderAccountPivot(container);
   }
 
-  function renderExpensePivot(container, month, year) {
-    const expenses = Store.getByMonth('expenses', month, year);
-    const categories = Store.getCategories();
-    const monthLabel = UI.getMonthLabel(month, year);
-
-    const totals = {};
-    expenses.forEach(e => {
-      const cat = e.categoria || 'Sin categoría';
-      totals[cat] = (totals[cat] || 0) + Store.parseCurrency(e.gasto);
-    });
-
-    const usedCategories = categories.filter(c => totals[c] > 0).sort((a, b) => totals[b] - totals[a]);
-    if (!usedCategories.length) { container.innerHTML = emptyPivot(); return; }
-
-    let grandTotal = 0;
-    let html = `<div class="table-wrapper fade-in"><table class="data-table pivot-table">
-      <thead><tr><th>Categoría</th><th>${monthLabel}</th></tr></thead><tbody>`;
-
-    usedCategories.forEach(c => {
-      const v = totals[c];
-      grandTotal += v;
-      html += `<tr>
-        <td class="pivot-drillable" data-drill-key="categoria" data-drill-value="${c}"><strong>${c}</strong></td>
-        <td class="pivot-cell-value">${UI.formatCLP(v)}</td>
-      </tr>`;
-    });
-
-    html += `<tr class="pivot-total"><td><strong>Total</strong></td><td class="pivot-cell-value">${UI.formatCLP(grandTotal)}</td></tr>`;
-    html += `</tbody></table></div>`;
-    container.innerHTML = html;
-
+  function _bindPivotDrill(container) {
     container.querySelector('.pivot-table').addEventListener('click', (e) => {
       const cell = e.target.closest('.pivot-drillable');
       if (cell) App.drillDown(cell.dataset.drillKey, cell.dataset.drillValue);
     });
   }
 
-  function renderIncomePivot(container, month, year) {
-    const incomes = Store.getByMonth('incomes', month, year);
-    const monthLabel = UI.getMonthLabel(month, year);
+  function _renderPivotTable(container, rowLabel, drillKey, rowData, monthLabels, isRange) {
+    const rows = Object.entries(rowData)
+      .filter(([, amounts]) => amounts.some(a => a > 0))
+      .sort(([, a], [, b]) => b.reduce((x, y) => x + y, 0) - a.reduce((x, y) => x + y, 0));
 
-    if (!incomes.length) { container.innerHTML = emptyPivot(); return; }
+    if (!rows.length) { container.innerHTML = emptyPivot(); return; }
 
-    const sourceMap = {};
-    incomes.forEach(i => {
-      const src = i.fuente || 'Sin fuente';
-      sourceMap[src] = (sourceMap[src] || 0) + Store.parseCurrency(i.monto);
-    });
+    const monthTotals = new Array(monthLabels.length).fill(0);
+    rows.forEach(([, amounts]) => amounts.forEach((a, i) => { monthTotals[i] += a; }));
+    const grandTotal = monthTotals.reduce((a, b) => a + b, 0);
 
-    let grandTotal = 0;
-    let html = `<div class="table-wrapper fade-in"><table class="data-table pivot-table">
-      <thead><tr><th>Fuente</th><th>${monthLabel}</th></tr></thead><tbody>`;
+    let html = `<div class="table-wrapper fade-in"><table class="data-table pivot-table"><thead><tr>
+      <th>${rowLabel}</th>
+      ${monthLabels.map(l => `<th>${l}</th>`).join('')}
+      ${isRange ? '<th>Total</th>' : ''}
+    </tr></thead><tbody>`;
 
-    Object.entries(sourceMap).sort((a, b) => b[1] - a[1]).forEach(([src, v]) => {
-      grandTotal += v;
+    rows.forEach(([name, amounts]) => {
+      const rowTotal = amounts.reduce((a, b) => a + b, 0);
       html += `<tr>
-        <td class="pivot-drillable" data-drill-key="fuente" data-drill-value="${src}"><strong>${src}</strong></td>
-        <td class="pivot-cell-value">${UI.formatCLP(v)}</td>
+        <td class="pivot-drillable" data-drill-key="${drillKey}" data-drill-value="${name}"><strong>${name}</strong></td>
+        ${amounts.map(a => `<td class="pivot-cell-value">${UI.formatCLP(a)}</td>`).join('')}
+        ${isRange ? `<td class="pivot-cell-value"><strong>${UI.formatCLP(rowTotal)}</strong></td>` : ''}
       </tr>`;
     });
 
-    html += `<tr class="pivot-total"><td><strong>Total</strong></td><td class="pivot-cell-value">${UI.formatCLP(grandTotal)}</td></tr>`;
-    html += `</tbody></table></div>`;
+    html += `<tr class="pivot-total">
+      <td><strong>Total</strong></td>
+      ${monthTotals.map(t => `<td class="pivot-cell-value">${UI.formatCLP(t)}</td>`).join('')}
+      ${isRange ? `<td class="pivot-cell-value"><strong>${UI.formatCLP(grandTotal)}</strong></td>` : ''}
+    </tr></tbody></table></div>`;
     container.innerHTML = html;
-
-    container.querySelector('.pivot-table').addEventListener('click', (e) => {
-      const cell = e.target.closest('.pivot-drillable');
-      if (cell) App.drillDown(cell.dataset.drillKey, cell.dataset.drillValue);
-    });
+    _bindPivotDrill(container);
   }
 
-  function renderSavingsPivot(container, month, year) {
-    const savings = Store.getByMonth('savings', month, year);
-    const categories = Store.getSavingsCategories();
-    const monthLabel = UI.getMonthLabel(month, year);
-
-    const totals = {};
-    savings.forEach(r => {
+  function renderExpensePivot(container, months) {
+    const records = Store.getByMonths('expenses', months);
+    const monthLabels = months.map(({month, year}) => UI.getMonthLabel(month, year));
+    const rowData = {};
+    records.forEach(r => {
       const cat = r.categoria || 'Sin categoría';
-      totals[cat] = (totals[cat] || 0) + Store.parseCurrency(r.monto);
+      if (!rowData[cat]) rowData[cat] = new Array(months.length).fill(0);
+      const idx = months.findIndex(({month, year}) => {
+        const p = Store.parseRecordDate('expenses', r.mesPago || r.fecha);
+        return p && p.month === month && p.year === year;
+      });
+      if (idx >= 0) rowData[cat][idx] += Store.parseCurrency(r.gasto);
     });
+    _renderPivotTable(container, 'Categoría', 'categoria', rowData, monthLabels, months.length > 1);
+  }
 
-    const usedCategories = categories.filter(c => totals[c] > 0).sort((a, b) => totals[b] - totals[a]);
-    if (!usedCategories.length) { container.innerHTML = emptyPivot(); return; }
-
-    let grandTotal = 0;
-    let html = `<div class="table-wrapper fade-in"><table class="data-table pivot-table">
-      <thead><tr><th>Categoría</th><th>${monthLabel}</th></tr></thead><tbody>`;
-
-    usedCategories.forEach(c => {
-      const v = totals[c];
-      grandTotal += v;
-      html += `<tr>
-        <td class="pivot-drillable" data-drill-key="categoria" data-drill-value="${c}"><strong>${c}</strong></td>
-        <td class="pivot-cell-value">${UI.formatCLP(v)}</td>
-      </tr>`;
+  function renderIncomePivot(container, months) {
+    const records = Store.getByMonths('incomes', months);
+    if (!records.length) { container.innerHTML = emptyPivot(); return; }
+    const monthLabels = months.map(({month, year}) => UI.getMonthLabel(month, year));
+    const rowData = {};
+    records.forEach(r => {
+      const src = r.fuente || 'Sin fuente';
+      if (!rowData[src]) rowData[src] = new Array(months.length).fill(0);
+      const idx = months.findIndex(({month, year}) => {
+        const p = Store.parseRecordDate('incomes', r.fecha);
+        return p && p.month === month && p.year === year;
+      });
+      if (idx >= 0) rowData[src][idx] += Store.parseCurrency(r.monto);
     });
+    _renderPivotTable(container, 'Fuente', 'fuente', rowData, monthLabels, months.length > 1);
+  }
 
-    html += `<tr class="pivot-total"><td><strong>Total</strong></td><td class="pivot-cell-value">${UI.formatCLP(grandTotal)}</td></tr>`;
-    html += `</tbody></table></div>`;
-    container.innerHTML = html;
-
-    container.querySelector('.pivot-table').addEventListener('click', (e) => {
-      const cell = e.target.closest('.pivot-drillable');
-      if (cell) App.drillDown(cell.dataset.drillKey, cell.dataset.drillValue);
+  function renderSavingsPivot(container, months) {
+    const records = Store.getByMonths('savings', months);
+    const monthLabels = months.map(({month, year}) => UI.getMonthLabel(month, year));
+    const rowData = {};
+    records.forEach(r => {
+      const cat = r.categoria || 'Sin categoría';
+      if (!rowData[cat]) rowData[cat] = new Array(months.length).fill(0);
+      const idx = months.findIndex(({month, year}) => {
+        const p = Store.parseRecordDate('savings', r.mesPago || r.fecha);
+        return p && p.month === month && p.year === year;
+      });
+      if (idx >= 0) rowData[cat][idx] += Store.parseCurrency(r.monto);
     });
+    _renderPivotTable(container, 'Categoría', 'categoria', rowData, monthLabels, months.length > 1);
   }
 
   function renderAccountPivot(container) {
@@ -359,7 +336,7 @@ const TableView = (() => {
     const pivot = {};
     accounts.forEach(a => {
       const persona = a.persona || 'Desconocido';
-      const tipo = a.tipo || 'Sin tipo';
+      const tipo    = a.tipo    || 'Sin tipo';
       const key = `${persona}|||${tipo}`;
       pivot[key] = (pivot[key] || 0) + Store.parseCurrency(a.monto);
     });
@@ -377,11 +354,7 @@ const TableView = (() => {
     });
     html += `</tbody></table></div>`;
     container.innerHTML = html;
-
-    container.querySelector('.pivot-table').addEventListener('click', (e) => {
-      const cell = e.target.closest('.pivot-drillable');
-      if (cell) App.drillDown(cell.dataset.drillKey, cell.dataset.drillValue);
-    });
+    _bindPivotDrill(container);
   }
 
   function emptyPivot() {

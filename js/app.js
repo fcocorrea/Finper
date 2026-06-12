@@ -7,15 +7,33 @@ const App = (() => {
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
     drillFilter: null,
+    rangeMonths: null,
   };
 
   let _initialized = false;
+
+  const _SHORT_MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+  function getActiveMonths() {
+    return state.rangeMonths || [{ month: state.month, year: state.year }];
+  }
+
+  function _buildMonthRange(fromMonth, fromYear, toMonth, toYear) {
+    const result = [];
+    let m = fromMonth, y = fromYear;
+    while ((y < toYear || (y === toYear && m <= toMonth)) && result.length < 120) {
+      result.push({ month: m, year: y });
+      if (++m > 12) { m = 1; y++; }
+    }
+    return result;
+  }
 
   async function init() {
     if (_initialized) return;
     _initialized = true;
     bindNavbar();
     bindToolbar();
+    bindRangePicker();
     bindCloseModals();
     await Store.init();
     refresh();
@@ -23,15 +41,16 @@ const App = (() => {
 
   function refresh() {
     updateMonthDisplay();
-    const { dataType, viewMode, month, year } = state;
+    const { dataType, viewMode } = state;
+    const months = getActiveMonths();
 
     document.getElementById('view-dashboard').classList.toggle('hidden', viewMode !== 'dashboard');
     document.getElementById('view-table').classList.toggle('hidden', viewMode !== 'table');
     document.getElementById('view-pivot').classList.toggle('hidden', viewMode !== 'pivot');
 
-    if (viewMode === 'dashboard') Dashboard.render(dataType, month, year);
-    else if (viewMode === 'table') TableView.render(dataType, month, year, state.drillFilter);
-    else if (viewMode === 'pivot') TableView.renderPivot(dataType, month, year);
+    if (viewMode === 'dashboard') Dashboard.render(dataType, months);
+    else if (viewMode === 'table') TableView.render(dataType, months, state.drillFilter);
+    else if (viewMode === 'pivot') TableView.renderPivot(dataType, months);
   }
 
   // ---------- NAVBAR ----------
@@ -130,7 +149,14 @@ const App = (() => {
   }
 
   function updateMonthDisplay() {
-    document.getElementById('month-display').textContent = UI.getMonthLabel(state.month, state.year);
+    if (state.rangeMonths && state.rangeMonths.length > 0) {
+      const first = state.rangeMonths[0];
+      const last = state.rangeMonths[state.rangeMonths.length - 1];
+      document.getElementById('month-display').textContent =
+        `${UI.getMonthLabel(first.month, first.year)} – ${UI.getMonthLabel(last.month, last.year)}`;
+    } else {
+      document.getElementById('month-display').textContent = UI.getMonthLabel(state.month, state.year);
+    }
   }
 
   // ---------- ADD MODAL ----------
@@ -457,6 +483,112 @@ const App = (() => {
     }
   }
 
+  // ---------- RANGE PICKER ----------
+  function bindRangePicker() {
+    const btn = document.getElementById('range-picker-btn');
+    const popover = document.getElementById('range-popover');
+
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!popover.classList.contains('hidden')) {
+        popover.classList.add('hidden');
+        return;
+      }
+      popover.innerHTML = _renderRangePopover();
+      popover.classList.remove('hidden');
+
+      document.getElementById('range-apply').addEventListener('click', () => {
+        const fromMonth = parseInt(document.getElementById('range-from-month').value);
+        const fromYear  = parseInt(document.getElementById('range-from-year').value);
+        const toMonth   = parseInt(document.getElementById('range-to-month').value);
+        const toYear    = parseInt(document.getElementById('range-to-year').value);
+        if (fromYear > toYear || (fromYear === toYear && fromMonth > toMonth)) {
+          UI.toast('La fecha inicio debe ser anterior a la fecha final', 'warning');
+          return;
+        }
+        state.rangeMonths = _buildMonthRange(fromMonth, fromYear, toMonth, toYear);
+        popover.classList.add('hidden');
+        _updateRangeButton();
+        refresh();
+      });
+
+      const clearBtn = document.getElementById('range-clear');
+      if (clearBtn) {
+        clearBtn.addEventListener('click', () => {
+          state.rangeMonths = null;
+          popover.classList.add('hidden');
+          _updateRangeButton();
+          refresh();
+        });
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!document.getElementById('range-picker-wrapper').contains(e.target)) {
+        popover.classList.add('hidden');
+      }
+    });
+  }
+
+  function _renderRangePopover() {
+    const currentYear = new Date().getFullYear();
+    const years = [];
+    for (let y = currentYear - 3; y <= currentYear + 1; y++) years.push(y);
+
+    const fromMonth = state.rangeMonths ? state.rangeMonths[0].month : state.month;
+    const fromYear  = state.rangeMonths ? state.rangeMonths[0].year  : state.year;
+    const toMonth   = state.rangeMonths ? state.rangeMonths[state.rangeMonths.length - 1].month : state.month;
+    const toYear    = state.rangeMonths ? state.rangeMonths[state.rangeMonths.length - 1].year  : state.year;
+
+    const monthOpts = (sel) => _SHORT_MONTHS.map((n, i) =>
+      `<option value="${i+1}"${i+1===sel?' selected':''}>${n}</option>`).join('');
+    const yearOpts  = (sel) => years.map(y =>
+      `<option value="${y}"${y===sel?' selected':''}>${y}</option>`).join('');
+
+    return `
+      <div class="range-popover-inner">
+        <div class="range-fields">
+          <div class="range-field">
+            <span class="range-field-label">Desde</span>
+            <div class="range-selects">
+              <select id="range-from-month">${monthOpts(fromMonth)}</select>
+              <select id="range-from-year">${yearOpts(fromYear)}</select>
+            </div>
+          </div>
+          <span class="range-arrow">→</span>
+          <div class="range-field">
+            <span class="range-field-label">Hasta</span>
+            <div class="range-selects">
+              <select id="range-to-month">${monthOpts(toMonth)}</select>
+              <select id="range-to-year">${yearOpts(toYear)}</select>
+            </div>
+          </div>
+        </div>
+        <div class="range-actions">
+          ${state.rangeMonths ? '<button class="btn btn-outline" id="range-clear">Limpiar</button>' : ''}
+          <button class="btn btn-primary" id="range-apply">Aplicar</button>
+        </div>
+      </div>`;
+  }
+
+  function _updateRangeButton() {
+    const btn = document.getElementById('range-picker-btn');
+    if (!btn) return;
+    if (state.rangeMonths && state.rangeMonths.length > 0) {
+      const first = state.rangeMonths[0];
+      const last  = state.rangeMonths[state.rangeMonths.length - 1];
+      btn.textContent = `${_SHORT_MONTHS[first.month-1]} ${String(first.year).slice(-2)} – ${_SHORT_MONTHS[last.month-1]} ${String(last.year).slice(-2)}`;
+      btn.classList.add('active');
+    } else {
+      btn.textContent = 'Meses';
+      btn.classList.remove('active');
+    }
+    const monthPrev = document.getElementById('month-prev');
+    const monthNext = document.getElementById('month-next');
+    if (monthPrev) monthPrev.disabled = !!state.rangeMonths;
+    if (monthNext) monthNext.disabled = !!state.rangeMonths;
+  }
+
   // ---------- DRILL DOWN ----------
   function drillDown(key, value) {
     state.drillFilter = { key, value };
@@ -488,7 +620,7 @@ const App = (() => {
     });
   }
 
-  return { init, refresh, drillDown, clearDrillFilter };
+  return { init, refresh, drillDown, clearDrillFilter, getActiveMonths };
 })();
 
 // Boot
