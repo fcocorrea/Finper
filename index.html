@@ -58,7 +58,6 @@
             <a href="#" id="dropdown-archivo-importar">Importar</a>
             <div class="dropdown-divider"></div>
             <a href="#" id="dropdown-archivo-descargar">Descargar</a>
-            <a href="#" id="dropdown-archivo-eliminar" class="danger">Eliminar</a>
           </div>
         </div>
       </div>
@@ -87,10 +86,19 @@
         <div class="toolbar-separator"></div>
 
         <!-- Month Picker -->
-        <div class="month-picker">
-          <button class="btn-icon btn-ghost" id="month-prev">&lt;</button>
-          <span class="month-display" id="month-display">Mayo 2026</span>
-          <button class="btn-icon btn-ghost" id="month-next">&gt;</button>
+        <div class="month-picker-wrap">
+          <div class="month-picker">
+            <button class="btn-icon btn-ghost" id="month-prev">&lt;</button>
+            <span class="month-display" id="month-display">Mayo 2026</span>
+            <button class="btn-icon btn-ghost" id="month-next">&gt;</button>
+          </div>
+          <div class="date-mode-toggle" id="date-mode-toggle">
+            <button class="date-mode-btn" id="date-mode-btn">Mes gasto</button>
+            <div class="date-mode-menu" id="date-mode-menu">
+              <button class="date-mode-option" data-mode="mesPago">Mes Pago</button>
+              <button class="date-mode-option active" data-mode="fecha">Mes gasto</button>
+            </div>
+          </div>
         </div>
 
         <div class="toolbar-separator"></div>

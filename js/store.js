@@ -1,6 +1,10 @@
 // store.js — Data persistence layer using localStorage
 
 const Store = (() => {
+  let _dateMode = 'mesPago';
+
+  function setDateMode(mode) { _dateMode = mode; }
+
   const KEYS = {
     expenses: 'finper_expenses',
     incomes: 'finper_incomes',
@@ -312,7 +316,8 @@ const Store = (() => {
     return all.filter(record => {
       let dateStr;
       if (type === 'expenses' || type === 'savings') {
-        dateStr = record.mesPago || record.fecha;
+        // ponytail: _dateMode='fecha' filters by exact date instead of billing month
+        dateStr = _dateMode === 'fecha' ? record.fecha : (record.mesPago || record.fecha);
       } else {
         dateStr = record.fecha;
       }
@@ -383,7 +388,7 @@ const Store = (() => {
     getColumns, setColumns,
     getIncomeSources, addIncomeSource,
     getSuggestions, predictCategory,
-    getByMonths, getByMonth, parseRecordDate,
+    setDateMode, getByMonths, getByMonth, parseRecordDate,
     getTotalIncome, getTotalExpenses, getTotalSavings, parseCurrency,
     DEFAULT_COLUMNS,
   };

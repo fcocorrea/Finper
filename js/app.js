@@ -8,6 +8,7 @@ const App = (() => {
     year: new Date().getFullYear(),
     drillFilter: null,
     rangeMonths: null,
+    dateMode: 'fecha',
   };
 
   let _initialized = false;
@@ -48,6 +49,7 @@ const App = (() => {
     document.getElementById('view-table').classList.toggle('hidden', viewMode !== 'table');
     document.getElementById('view-pivot').classList.toggle('hidden', viewMode !== 'pivot');
 
+    Store.setDateMode(state.dateMode);
     if (viewMode === 'dashboard') Dashboard.render(dataType, months);
     else if (viewMode === 'table') TableView.render(dataType, months, state.drillFilter);
     else if (viewMode === 'pivot') TableView.renderPivot(dataType, months);
@@ -103,10 +105,6 @@ const App = (() => {
       e.preventDefault();
       Archivo.openDownload();
     });
-    document.getElementById('dropdown-archivo-eliminar').addEventListener('click', (e) => {
-      e.preventDefault();
-      Archivo.openDelete();
-    });
   }
 
   // ---------- TOOLBAR ----------
@@ -128,6 +126,18 @@ const App = (() => {
         document.querySelectorAll('#view-mode-toggle .toggle-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         state.viewMode = btn.dataset.view;
+        state.drillFilter = null;
+        refresh();
+      });
+    });
+
+    // Date mode options
+    document.querySelectorAll('.date-mode-option').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.dateMode = btn.dataset.mode;
+        document.querySelectorAll('.date-mode-option').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('date-mode-btn').textContent = btn.textContent;
         state.drillFilter = null;
         refresh();
       });
@@ -227,7 +237,6 @@ const App = (() => {
         if (!fecha || !monto) { UI.toast('Completa los campos obligatorios', 'warning'); return; }
         Store.add('incomes', { fecha, monto: parseInt(monto), fuente });
         Store.addIncomeSource(fuente);
-        UI.toast('Ingreso registrado', 'success');
         UI.closeModal('modal-add');
         refresh();
       });
@@ -335,7 +344,7 @@ const App = (() => {
         const medioPago = document.getElementById('add-medioPago').value;
         const cuotas = parseInt(document.getElementById('add-cuotas')?.value) || 0;
 
-        if (!fecha || !gasto || !categoria) {
+        if (!fecha || !gasto || !categoria || !tipo || !medioPago) {
           UI.toast('Completa los campos obligatorios', 'warning');
           return;
         }
@@ -362,10 +371,8 @@ const App = (() => {
               medioPago,
             });
           }
-          UI.toast(`${cuotas} cuotas de ${UI.formatCLP(montoCuota)} registradas`, 'success');
         } else {
           Store.add('expenses', { fecha, mesPago, categoria, gasto, comentario, tipo, medioPago });
-          UI.toast('Gasto registrado', 'success');
         }
 
         UI.closeModal('modal-add');
@@ -419,7 +426,6 @@ const App = (() => {
         const monto = parseInt(document.getElementById('add-monto').value) || 0;
         if (!fecha || !persona || !monto) { UI.toast('Completa los campos obligatorios', 'warning'); return; }
         Store.add('accounts', { fecha, persona, descripcion, tipo, monto });
-        UI.toast('Cuenta registrada', 'success');
         UI.closeModal('modal-add');
         refresh();
       });
@@ -476,7 +482,6 @@ const App = (() => {
         const institucion = document.getElementById('add-institucion').value.trim();
         if (!fecha || !monto || !categoria) { UI.toast('Completa los campos obligatorios', 'warning'); return; }
         Store.add('savings', { fecha, mesPago, categoria, monto, descripcion, institucion });
-        UI.toast('Ahorro / Inversión registrado', 'success');
         UI.closeModal('modal-add');
         refresh();
       });

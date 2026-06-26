@@ -9,8 +9,8 @@ const TableView = (() => {
   let _lastFocusedCol = null;
 
   function _resetTableState() {
-    _sortKey = null;
-    _sortDir = 'asc';
+    _sortKey = 'fecha';
+    _sortDir = 'desc';
     _filters = {};
     _lastFocusedCol = null;
   }
