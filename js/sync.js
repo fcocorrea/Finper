@@ -240,6 +240,9 @@ const Sync = (() => {
 
   async function pull() {
     if (!_db) return false;
+    // Ensure session is restored before querying (Supabase client recovers async)
+    const { data: { session } } = await _db.auth.getSession();
+    if (!session) return false;
     try {
       await _loadCategories();
 
