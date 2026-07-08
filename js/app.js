@@ -176,19 +176,15 @@ const App = (() => {
       <p class="form-label" style="margin-bottom:var(--space-4)">¿Qué deseas registrar?</p>
       <div class="type-selector">
         <div class="type-card" data-add-type="incomes">
-          <div class="type-card-icon">💰</div>
           <div class="type-card-label">Ingreso</div>
         </div>
         <div class="type-card" data-add-type="expenses">
-          <div class="type-card-icon">💸</div>
           <div class="type-card-label">Gasto</div>
         </div>
         <div class="type-card" data-add-type="accounts">
-          <div class="type-card-icon">📒</div>
           <div class="type-card-label">Cuenta</div>
         </div>
         <div class="type-card" data-add-type="savings">
-          <div class="type-card-icon">🏦</div>
           <div class="type-card-label">Ahorro / Inversión</div>
         </div>
       </div>
@@ -196,6 +192,16 @@ const App = (() => {
     content.querySelectorAll('.type-card').forEach(card => {
       card.addEventListener('click', () => renderAddForm(card.dataset.addType));
     });
+  }
+
+  function flashSaved(btn) {
+    const original = btn.textContent;
+    btn.classList.add('btn-save-flash');
+    btn.textContent = '✓';
+    setTimeout(() => {
+      btn.classList.remove('btn-save-flash');
+      btn.textContent = original;
+    }, 600);
   }
 
   function renderAddForm(type) {
@@ -220,6 +226,7 @@ const App = (() => {
         <div class="modal-footer">
           <button class="btn btn-outline" id="add-back">← Volver</button>
           <button class="btn btn-primary" id="add-save">Guardar</button>
+          <button class="btn btn-outline btn-icon" id="add-save-continue" title="Guardar y agregar otro">+</button>
         </div>
       `;
 
@@ -229,16 +236,23 @@ const App = (() => {
         null
       );
 
-      document.getElementById('add-back').addEventListener('click', renderAddStep1);
-      document.getElementById('add-save').addEventListener('click', () => {
+      const saveIncome = () => {
         const fecha = document.getElementById('add-fecha').value.trim();
         const monto = document.getElementById('add-monto').value.trim();
         const fuente = document.getElementById('add-fuente').value.trim();
-        if (!fecha || !monto) { UI.toast('Completa los campos obligatorios', 'warning'); return; }
+        if (!fecha || !monto) { UI.toast('Completa los campos obligatorios', 'warning'); return false; }
         Store.add('incomes', { fecha, monto: parseInt(monto), fuente });
         Store.addIncomeSource(fuente);
-        UI.closeModal('modal-add');
         refresh();
+        return true;
+      };
+
+      document.getElementById('add-back').addEventListener('click', renderAddStep1);
+      document.getElementById('add-save').addEventListener('click', () => {
+        if (saveIncome()) UI.closeModal('modal-add');
+      });
+      document.getElementById('add-save-continue').addEventListener('click', (e) => {
+        if (saveIncome()) flashSaved(e.currentTarget);
       });
 
     } else if (type === 'expenses') {
@@ -283,6 +297,7 @@ const App = (() => {
         <div class="modal-footer">
           <button class="btn btn-outline" id="add-back">← Volver</button>
           <button class="btn btn-primary" id="add-save">Guardar</button>
+          <button class="btn btn-outline btn-icon" id="add-save-continue" title="Guardar y agregar otro">+</button>
         </div>
       `;
 
@@ -333,8 +348,7 @@ const App = (() => {
         }
       });
 
-      document.getElementById('add-back').addEventListener('click', renderAddStep1);
-      document.getElementById('add-save').addEventListener('click', () => {
+      const saveExpense = () => {
         const fecha = document.getElementById('add-fecha').value.trim();
         const mesPago = document.getElementById('add-mesPago').value.trim();
         const categoria = document.getElementById('add-categoria').value;
@@ -346,7 +360,7 @@ const App = (() => {
 
         if (!fecha || !gasto || !categoria || !tipo || !medioPago) {
           UI.toast('Completa los campos obligatorios', 'warning');
-          return;
+          return false;
         }
 
         if (medioPago === 'Tarjeta de crédito en cuotas' && cuotas >= 2) {
@@ -375,8 +389,16 @@ const App = (() => {
           Store.add('expenses', { fecha, mesPago, categoria, gasto, comentario, tipo, medioPago });
         }
 
-        UI.closeModal('modal-add');
         refresh();
+        return true;
+      };
+
+      document.getElementById('add-back').addEventListener('click', renderAddStep1);
+      document.getElementById('add-save').addEventListener('click', () => {
+        if (saveExpense()) UI.closeModal('modal-add');
+      });
+      document.getElementById('add-save-continue').addEventListener('click', (e) => {
+        if (saveExpense()) flashSaved(e.currentTarget);
       });
 
     } else if (type === 'accounts') {
@@ -407,6 +429,7 @@ const App = (() => {
         <div class="modal-footer">
           <button class="btn btn-outline" id="add-back">← Volver</button>
           <button class="btn btn-primary" id="add-save">Guardar</button>
+          <button class="btn btn-outline btn-icon" id="add-save-continue" title="Guardar y agregar otro">+</button>
         </div>
       `;
 
@@ -417,17 +440,24 @@ const App = (() => {
         null
       );
 
-      document.getElementById('add-back').addEventListener('click', renderAddStep1);
-      document.getElementById('add-save').addEventListener('click', () => {
+      const saveAccount = () => {
         const fecha = document.getElementById('add-fecha').value.trim();
         const persona = document.getElementById('add-persona').value.trim();
         const descripcion = document.getElementById('add-descripcion').value.trim();
         const tipo = document.getElementById('add-tipo').value;
         const monto = parseInt(document.getElementById('add-monto').value) || 0;
-        if (!fecha || !persona || !monto) { UI.toast('Completa los campos obligatorios', 'warning'); return; }
+        if (!fecha || !persona || !monto) { UI.toast('Completa los campos obligatorios', 'warning'); return false; }
         Store.add('accounts', { fecha, persona, descripcion, tipo, monto });
-        UI.closeModal('modal-add');
         refresh();
+        return true;
+      };
+
+      document.getElementById('add-back').addEventListener('click', renderAddStep1);
+      document.getElementById('add-save').addEventListener('click', () => {
+        if (saveAccount()) UI.closeModal('modal-add');
+      });
+      document.getElementById('add-save-continue').addEventListener('click', (e) => {
+        if (saveAccount()) flashSaved(e.currentTarget);
       });
 
     } else if (type === 'savings') {
@@ -462,6 +492,7 @@ const App = (() => {
         <div class="modal-footer">
           <button class="btn btn-outline" id="add-back">← Volver</button>
           <button class="btn btn-primary" id="add-save">Guardar</button>
+          <button class="btn btn-outline btn-icon" id="add-save-continue" title="Guardar y agregar otro">+</button>
         </div>
       `;
 
@@ -472,18 +503,25 @@ const App = (() => {
         null
       );
 
-      document.getElementById('add-back').addEventListener('click', renderAddStep1);
-      document.getElementById('add-save').addEventListener('click', () => {
+      const saveSavings = () => {
         const fecha = document.getElementById('add-fecha').value.trim();
         const mesPago = document.getElementById('add-mesPago').value.trim();
         const categoria = document.getElementById('add-categoria').value;
         const monto = parseInt(document.getElementById('add-monto').value) || 0;
         const descripcion = document.getElementById('add-descripcion').value.trim();
         const institucion = document.getElementById('add-institucion').value.trim();
-        if (!fecha || !monto || !categoria) { UI.toast('Completa los campos obligatorios', 'warning'); return; }
+        if (!fecha || !monto || !categoria) { UI.toast('Completa los campos obligatorios', 'warning'); return false; }
         Store.add('savings', { fecha, mesPago, categoria, monto, descripcion, institucion });
-        UI.closeModal('modal-add');
         refresh();
+        return true;
+      };
+
+      document.getElementById('add-back').addEventListener('click', renderAddStep1);
+      document.getElementById('add-save').addEventListener('click', () => {
+        if (saveSavings()) UI.closeModal('modal-add');
+      });
+      document.getElementById('add-save-continue').addEventListener('click', (e) => {
+        if (saveSavings()) flashSaved(e.currentTarget);
       });
     }
   }

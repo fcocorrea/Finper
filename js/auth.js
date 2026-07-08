@@ -198,9 +198,9 @@ const Auth = (() => {
             <h1 class="auth-brand-name">Finper</h1>
             <p class="auth-brand-tagline">Tus finanzas, bajo control.</p>
             <ul class="auth-brand-features">
-              <li><span class="auth-feat-icon">📊</span> Gastos e Ingresos</li>
-              <li><span class="auth-feat-icon">💳</span> Cuentas y Ahorros</li>
-              <li><span class="auth-feat-icon">📈</span> Análisis en tiempo real</li>
+              <li>Gastos e Ingresos</li>
+              <li>Cuentas y Ahorros</li>
+              <li>Análisis en tiempo real</li>
             </ul>
           </div>
         </div>

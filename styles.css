@@ -803,6 +803,12 @@ body {
   margin-right: auto;
 }
 
+.btn-save-flash {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: #fff;
+}
+
 /* ===== RANGE PICKER ===== */
 .range-picker-wrapper {
   position: relative;
@@ -917,11 +923,6 @@ body {
   border-color: var(--color-primary);
   background: rgba(74, 124, 247, 0.08);
   box-shadow: var(--shadow-glow-primary);
-}
-
-.type-card-icon {
-  font-size: var(--text-2xl);
-  margin-bottom: var(--space-2);
 }
 
 .type-card-label {
@@ -1558,10 +1559,6 @@ body {
   border-radius: var(--radius-full);
   backdrop-filter: blur(4px);
   border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.auth-feat-icon {
-  font-size: 1.1rem;
 }
 
 /* ── Right: Forms panel ── */
