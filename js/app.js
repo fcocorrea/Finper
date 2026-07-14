@@ -225,8 +225,8 @@ const App = (() => {
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" id="add-back">← Volver</button>
-          <button class="btn btn-primary" id="add-save">Guardar</button>
           <button class="btn btn-outline btn-icon" id="add-save-continue" title="Guardar y agregar otro">+</button>
+          <button class="btn btn-primary" id="add-save">Guardar</button>
         </div>
       `;
 
@@ -296,8 +296,8 @@ const App = (() => {
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" id="add-back">← Volver</button>
-          <button class="btn btn-primary" id="add-save">Guardar</button>
           <button class="btn btn-outline btn-icon" id="add-save-continue" title="Guardar y agregar otro">+</button>
+          <button class="btn btn-primary" id="add-save">Guardar</button>
         </div>
       `;
 
@@ -428,8 +428,8 @@ const App = (() => {
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" id="add-back">← Volver</button>
-          <button class="btn btn-primary" id="add-save">Guardar</button>
           <button class="btn btn-outline btn-icon" id="add-save-continue" title="Guardar y agregar otro">+</button>
+          <button class="btn btn-primary" id="add-save">Guardar</button>
         </div>
       `;
 
@@ -491,8 +491,8 @@ const App = (() => {
         </div>
         <div class="modal-footer">
           <button class="btn btn-outline" id="add-back">← Volver</button>
-          <button class="btn btn-primary" id="add-save">Guardar</button>
           <button class="btn btn-outline btn-icon" id="add-save-continue" title="Guardar y agregar otro">+</button>
+          <button class="btn btn-primary" id="add-save">Guardar</button>
         </div>
       `;
 
