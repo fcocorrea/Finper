@@ -459,6 +459,11 @@ body {
   color: var(--color-text);
 }
 
+.budget-row-pct {
+  font-weight: 400;
+  color: var(--color-muted);
+}
+
 .budget-row-amounts {
   color: var(--color-muted);
 }

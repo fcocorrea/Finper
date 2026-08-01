@@ -17,7 +17,7 @@ const Store = (() => {
     accountTypes: 'finper_account_types',
     incomeSources: 'finper_income_sources',
     savingsCategories: 'finper_savings_categories',
-    budgets: 'finper_budgets',
+    budgetGroups: 'finper_budget_groups',
   };
 
   const DEFAULT_CATEGORIES = [
@@ -29,6 +29,16 @@ const Store = (() => {
 
   const DEFAULT_SAVINGS_CATEGORIES = [
     'Fondo Mutuo', 'Depósito a Plazo', 'Acciones', 'ETF', 'AFP/Pensión', 'Efectivo', 'Trading', 'Otros',
+  ];
+
+  // "5 facetas" budgeting model — each persona gets a % of income and owns a set
+  // of expense/savings categories. See project discussion for the source concept.
+  const DEFAULT_BUDGET_GROUPS = [
+    { nombre: 'Gastón', porcentaje: 60, categorias: ['Vivienda', 'Servicios', 'Supermercado', 'Alimentación', 'Energia', 'Transporte', 'Comunicación', 'Banco/Intereses', 'Trámites', 'Orden/Higiene', 'Educación', 'Niñitas', 'Utilidad'] },
+    { nombre: 'Agustín', porcentaje: 10, categorias: ['Carrete', 'Ocio', 'Salida a comer', 'Delivery', 'Aplicación', 'Panorama', 'Regalo', 'Ropa', 'Software'] },
+    { nombre: 'Ángeles', porcentaje: 10, categorias: ['Salud', 'Depósito a Plazo', 'AFP/Pensión'] },
+    { nombre: 'Alicia', porcentaje: 10, categorias: ['Efectivo', 'Otros'] },
+    { nombre: 'Sofía', porcentaje: 10, categorias: ['Fondo Mutuo', 'Acciones', 'ETF', 'Trading'] },
   ];
 
   const DEFAULT_EXPENSE_TYPES = ['Variable', 'Fijo', 'Deuda'];
@@ -95,7 +105,8 @@ const Store = (() => {
     if (!_get(KEYS.incomes)) _set(KEYS.incomes, []);
     if (!_get(KEYS.accounts)) _set(KEYS.accounts, []);
     if (!_get(KEYS.savings)) _set(KEYS.savings, []);
-    if (!_get(KEYS.budgets)) _set(KEYS.budgets, []);
+    const _seedBudgetGroups = !_get(KEYS.budgetGroups);
+    if (_seedBudgetGroups) _set(KEYS.budgetGroups, []);
     if (!_get(KEYS.incomeSources)) _set(KEYS.incomeSources, []);
     if (!_get(KEYS.savingsCategories)) _set(KEYS.savingsCategories, DEFAULT_SAVINGS_CATEGORIES);
     const _sc = _get(KEYS.savingsCategories);
@@ -105,8 +116,11 @@ const Store = (() => {
 
     if (typeof Sync !== 'undefined') {
       Sync.init();
+      // Seed after Sync.init() so the initial push actually reaches Supabase.
+      if (_seedBudgetGroups) DEFAULT_BUDGET_GROUPS.forEach(g => add('budgetGroups', { ...g }));
       return Sync.pull();
     }
+    if (_seedBudgetGroups) DEFAULT_BUDGET_GROUPS.forEach(g => add('budgetGroups', { ...g }));
     return Promise.resolve(true);
   }
 
@@ -217,8 +231,7 @@ const Store = (() => {
     if (expenses.some(e => e.categoria === name)) return { error: 'in_use' };
     let cats = getCategories().filter(c => c !== name);
     _set(KEYS.categories, cats);
-    const budget = getBudgets().find(b => b.categoria === name);
-    if (budget) remove('budgets', budget.id);
+    _removeCategoryFromGroups(name);
     return { success: true };
   }
   function renameCategory(oldName, newName) {
@@ -231,26 +244,42 @@ const Store = (() => {
     const expenses = getAll('expenses');
     expenses.forEach(e => { if (e.categoria === oldName) e.categoria = newName; });
     _set(KEYS.expenses, expenses);
-    const budget = getBudgets().find(b => b.categoria === oldName);
-    if (budget) update('budgets', budget.id, { categoria: newName });
+    _renameCategoryInGroups(oldName, newName);
     return true;
   }
 
-  // ---------- BUDGETS ----------
-  function getBudgets() { return getAll('budgets'); }
-  function getBudgetForCategory(categoria) {
-    const budget = getBudgets().find(b => b.categoria === categoria);
-    return budget ? parseCurrency(budget.monto) : 0;
+  // ---------- BUDGET GROUPS ("5 facetas") ----------
+  function getBudgetGroups() { return getAll('budgetGroups'); }
+  function addBudgetGroup(nombre, porcentaje) {
+    return add('budgetGroups', { nombre, porcentaje: parseFloat(porcentaje) || 0, categorias: [] });
   }
-  function setBudget(categoria, monto) {
-    const amount = parseCurrency(monto);
-    const existing = getBudgets().find(b => b.categoria === categoria);
-    if (amount <= 0) {
-      if (existing) remove('budgets', existing.id);
-      return;
-    }
-    if (existing) update('budgets', existing.id, { monto: amount });
-    else add('budgets', { categoria, monto: amount });
+  function updateBudgetGroup(id, updates) { return update('budgetGroups', id, updates); }
+  function removeBudgetGroup(id) { remove('budgetGroups', id); }
+  function getGroupForCategory(categoria) {
+    return getBudgetGroups().find(g => (g.categorias || []).includes(categoria)) || null;
+  }
+  function assignCategoryToGroup(categoria, groupId) {
+    getBudgetGroups().forEach(g => {
+      const cats = g.categorias || [];
+      const hasIt = cats.includes(categoria);
+      const shouldHaveIt = g.id === groupId;
+      if (hasIt && !shouldHaveIt) update('budgetGroups', g.id, { categorias: cats.filter(c => c !== categoria) });
+      else if (!hasIt && shouldHaveIt) update('budgetGroups', g.id, { categorias: [...cats, categoria] });
+    });
+  }
+  function _removeCategoryFromGroups(name) {
+    getBudgetGroups().forEach(g => {
+      if ((g.categorias || []).includes(name)) {
+        update('budgetGroups', g.id, { categorias: g.categorias.filter(c => c !== name) });
+      }
+    });
+  }
+  function _renameCategoryInGroups(oldName, newName) {
+    getBudgetGroups().forEach(g => {
+      if ((g.categorias || []).includes(oldName)) {
+        update('budgetGroups', g.id, { categorias: g.categorias.map(c => c === oldName ? newName : c) });
+      }
+    });
   }
 
   // ---------- EXPENSE TYPES ----------
@@ -316,6 +345,7 @@ const Store = (() => {
     const records = getAll('savings');
     if (records.some(r => r.categoria === name)) return { error: 'in_use' };
     _set(KEYS.savingsCategories, getSavingsCategories().filter(c => c !== name));
+    _removeCategoryFromGroups(name);
     return { success: true };
   }
   function renameSavingsCategory(oldName, newName) {
@@ -327,6 +357,7 @@ const Store = (() => {
     const records = getAll('savings');
     records.forEach(r => { if (r.categoria === oldName) r.categoria = newName; });
     _set(KEYS.savings, records);
+    _renameCategoryInGroups(oldName, newName);
     return true;
   }
 
@@ -418,7 +449,8 @@ const Store = (() => {
     getSuggestions, predictCategory,
     setDateMode, getByMonths, getByMonth, parseRecordDate,
     getTotalIncome, getTotalExpenses, getTotalSavings, parseCurrency,
-    getBudgets, getBudgetForCategory, setBudget,
+    getBudgetGroups, addBudgetGroup, updateBudgetGroup, removeBudgetGroup,
+    getGroupForCategory, assignCategoryToGroup,
     DEFAULT_COLUMNS,
   };
 })();

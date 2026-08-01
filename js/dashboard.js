@@ -574,37 +574,49 @@ const Dashboard = (() => {
       .reduce((sum, s) => sum + Store.parseCurrency(s.monto), 0);
   }
 
-  // ---------- PRESUPUESTO ----------
+  // ---------- PRESUPUESTO ("5 facetas") ----------
+  function getCategorySpend(categoria, month, year) {
+    const gasto = Store.getByMonth('expenses', month, year)
+      .filter(e => e.categoria === categoria)
+      .reduce((s, e) => s + Store.parseCurrency(e.gasto), 0);
+    const ahorro = Store.getByMonth('savings', month, year)
+      .filter(r => r.categoria === categoria)
+      .reduce((s, r) => s + Store.parseCurrency(r.monto), 0);
+    return gasto + ahorro;
+  }
+
   function renderPresupuestoDashboard(container, months) {
-    const budgets = Store.getBudgets();
-    if (!budgets.length) {
+    const groups = Store.getBudgetGroups();
+    if (!groups.length) {
       container.innerHTML = `
         <div class="empty-state fade-in">
-          <div class="empty-state-text">No hay presupuestos configurados</div>
-          <div class="empty-state-hint">Ve a Edición → Gastos → Editar presupuestos para definir montos por categoría</div>
+          <div class="empty-state-text">No hay grupos de presupuesto configurados</div>
+          <div class="empty-state-hint">Ve a Edición → Presupuesto (5 facetas) para crear tus grupos</div>
         </div>`;
       return;
     }
 
     const isRange = months.length > 1;
+    const totalIncome = months.reduce((s, { month, year }) => s + Store.getTotalIncome(month, year), 0);
 
-    const spentByCategory = {};
-    months.forEach(({ month, year }) => {
-      Store.getByMonth('expenses', month, year).forEach(e => {
-        spentByCategory[e.categoria] = (spentByCategory[e.categoria] || 0) + Store.parseCurrency(e.gasto);
-      });
-    });
-
-    const rows = budgets
-      .map(b => {
-        const spent = spentByCategory[b.categoria] || 0;
-        const budget = Store.parseCurrency(b.monto) * months.length;
-        return { categoria: b.categoria, spent, budget, pct: budget > 0 ? (spent / budget) * 100 : 0 };
+    const rows = groups
+      .map(g => {
+        const categorias = g.categorias || [];
+        const spent = categorias.reduce((s, cat) =>
+          s + months.reduce((s2, { month, year }) => s2 + getCategorySpend(cat, month, year), 0), 0);
+        const target = Math.round(totalIncome * (parseFloat(g.porcentaje) || 0) / 100);
+        return { nombre: g.nombre, porcentaje: g.porcentaje, spent, target, pct: target > 0 ? (spent / target) * 100 : 0 };
       })
       .sort((a, b) => b.pct - a.pct);
 
+    const assignedCategorias = new Set(groups.flatMap(g => g.categorias || []));
+    const unassigned = [...Store.getCategories(), ...Store.getSavingsCategories()]
+      .filter(cat => !assignedCategorias.has(cat))
+      .map(cat => ({ categoria: cat, spent: months.reduce((s, { month, year }) => s + getCategorySpend(cat, month, year), 0) }))
+      .filter(r => r.spent > 0);
+
     const totalSpent  = rows.reduce((s, r) => s + r.spent, 0);
-    const totalBudget = rows.reduce((s, r) => s + r.budget, 0);
+    const pctSum      = groups.reduce((s, g) => s + (parseFloat(g.porcentaje) || 0), 0);
     const overCount   = rows.filter(r => r.pct >= 100).length;
 
     const rowsHTML = rows.map(r => {
@@ -612,30 +624,48 @@ const Dashboard = (() => {
       return `
         <div class="budget-row">
           <div class="budget-row-header">
-            <span class="budget-row-category">${r.categoria}</span>
-            <span class="budget-row-amounts">${UI.formatCLP(r.spent)} / ${UI.formatCLP(r.budget)}</span>
+            <span class="budget-row-category">${r.nombre} <span class="budget-row-pct">(${r.porcentaje}%)</span></span>
+            <span class="budget-row-amounts">${UI.formatCLP(r.spent)} / ${UI.formatCLP(r.target)}</span>
           </div>
           <div class="budget-bar"><div class="budget-bar-fill ${level}" style="width:${Math.min(r.pct, 100)}%"></div></div>
         </div>`;
     }).join('');
 
+    const unassignedHTML = unassigned.length ? `
+      <div class="chart-container fade-in" style="margin-top:var(--space-6)">
+        <div class="card-header"><h3 class="card-title">Sin grupo asignado</h3></div>
+        ${unassigned.map(r => `
+          <div class="budget-row">
+            <div class="budget-row-header">
+              <span class="budget-row-category">${r.categoria}</span>
+              <span class="budget-row-amounts">${UI.formatCLP(r.spent)}</span>
+            </div>
+          </div>`).join('')}
+      </div>` : '';
+
     container.innerHTML = `
       <div class="metrics-grid fade-in">
         <div class="metric-card">
-          <div class="metric-label">Presupuesto ${isRange ? `(${months.length} meses)` : 'del Mes'}</div>
-          <div class="metric-value ${totalSpent > totalBudget ? 'negative' : 'positive'}">${UI.formatCLP(totalSpent)}</div>
-          <div class="metric-detail">de ${UI.formatCLP(totalBudget)} presupuestado</div>
+          <div class="metric-label">Ingreso ${isRange ? `(${months.length} meses)` : 'del Mes'}</div>
+          <div class="metric-value positive">${UI.formatCLP(totalIncome)}</div>
+          <div class="metric-detail">${UI.formatCLP(totalSpent)} distribuido en grupos</div>
         </div>
         <div class="metric-card ${overCount > 0 ? 'accent' : 'success'}">
-          <div class="metric-label">Categorías sobre presupuesto</div>
+          <div class="metric-label">Grupos sobre presupuesto</div>
           <div class="metric-value ${overCount > 0 ? 'negative' : 'positive'}">${overCount} / ${rows.length}</div>
-          <div class="metric-detail">${overCount > 0 ? 'Revisa las categorías en rojo' : 'Todo dentro del presupuesto'}</div>
+          <div class="metric-detail">${overCount > 0 ? 'Revisa los grupos en rojo' : 'Todo dentro del presupuesto'}</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Suma de porcentajes</div>
+          <div class="metric-value ${pctSum === 100 ? 'positive' : 'warning'}">${pctSum}%</div>
+          <div class="metric-detail">Editable en Edición → Presupuesto</div>
         </div>
       </div>
       <div class="chart-container fade-in">
-        <div class="card-header"><h3 class="card-title">Presupuesto por Categoría</h3></div>
+        <div class="card-header"><h3 class="card-title">Presupuesto por Grupo</h3></div>
         ${rowsHTML}
-      </div>`;
+      </div>
+      ${unassignedHTML}`;
   }
 
   function renderExpenseLineChart(month, year) {
