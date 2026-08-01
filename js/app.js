@@ -3,7 +3,7 @@
 const App = (() => {
   let state = {
     dataType: 'expenses',
-    viewMode: 'dashboard',
+    viewMode: 'table',
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
     drillFilter: null,
