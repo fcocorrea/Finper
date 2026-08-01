@@ -6,5 +6,8 @@
 .mcp.json
 skills-lock.json
 
+# Backups con datos financieros privados
+respaldo/
+
 # Instrucciones específicas de Claude
 CLAUDE.md
