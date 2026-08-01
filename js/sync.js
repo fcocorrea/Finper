@@ -5,7 +5,7 @@
 // On app start, Supabase data is pulled to refresh localStorage so all devices
 // stay in sync.
 //
-// Tables synced: gastos, ingresos, cuentas_por_pagar_cobrar, ahorros
+// Tables synced: gastos, ingresos, cuentas_por_pagar_cobrar, ahorros, presupuestos_categoria
 
 const Sync = (() => {
   const SUPABASE_URL = 'https://cbecdmhrmbncyfkaztrb.supabase.co';
@@ -184,11 +184,32 @@ const Sync = (() => {
     };
   }
 
+  function _rowToBudget(row) {
+    return {
+      _supabase_id: row.id,
+      categoria:    row.categoria || '',
+      monto:        row.monto,
+      _created:     row.created_at,
+      _updated:     row.updated_at,
+    };
+  }
+
+  function _budgetToDB(r) {
+    if (!r.categoria) return null;
+    const userId = Auth.getCurrentUserId();
+    return {
+      user_id:  userId,
+      categoria: r.categoria,
+      monto:    Store.parseCurrency(r.monto),
+    };
+  }
+
   const _TABLES = {
     expenses: { table: 'gastos',                   toDB: _expenseToDB, toApp: _rowToExpense },
     incomes:  { table: 'ingresos',                 toDB: _incomeToDB,  toApp: _rowToIncome  },
     accounts: { table: 'cuentas_por_pagar_cobrar', toDB: _accountToDB, toApp: _rowToAccount },
     savings:  { table: 'ahorros',                  toDB: _savingsToDB, toApp: _rowToSavings },
+    budgets:  { table: 'presupuestos_categoria',   toDB: _budgetToDB,  toApp: _rowToBudget  },
   };
 
   // ── Ensure categories exist in Supabase ──────────────────────
@@ -251,11 +272,12 @@ const Sync = (() => {
     try {
       await _loadCategories();
 
-      const [expRes, incRes, accRes, savRes] = await Promise.all([
+      const [expRes, incRes, accRes, savRes, budRes] = await Promise.all([
         _db.from('gastos').select('*, categorias_gastos(nombre)').order('fecha', { ascending: false }),
         _db.from('ingresos').select('*').order('fecha', { ascending: false }),
         _db.from('cuentas_por_pagar_cobrar').select('*').order('fecha', { ascending: false }),
         _db.from('ahorros').select('*').order('fecha', { ascending: false }),
+        _db.from('presupuestos_categoria').select('*'),
       ]);
 
       let ok = true;
@@ -286,6 +308,13 @@ const Sync = (() => {
         console.error('[Sync] pull savings:', savRes.error.message);
       } else {
         _mergeIntoStorage('finper_savings', savRes.data.map(r => ({ id: _newId(), ..._rowToSavings(r) })));
+      }
+
+      if (budRes.error) {
+        ok = false;
+        console.error('[Sync] pull budgets:', budRes.error.message);
+      } else {
+        _mergeIntoStorage('finper_budgets', budRes.data.map(r => ({ id: _newId(), ..._rowToBudget(r) })));
       }
 
       return ok;

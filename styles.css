@@ -437,6 +437,49 @@ body {
 .chart-balance.positive .chart-balance-value { color: var(--color-success); }
 .chart-balance.negative .chart-balance-value { color: var(--color-danger); }
 
+/* ===== BUDGET PROGRESS ===== */
+.budget-row {
+  margin-bottom: var(--space-4);
+}
+
+.budget-row:last-child {
+  margin-bottom: 0;
+}
+
+.budget-row-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.budget-row-category {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.budget-row-amounts {
+  color: var(--color-muted);
+}
+
+.budget-bar {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-2);
+  overflow: hidden;
+}
+
+.budget-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width var(--transition-base);
+}
+
+.budget-bar-fill.success { background: var(--color-success); }
+.budget-bar-fill.warning { background: var(--color-warning); }
+.budget-bar-fill.danger  { background: var(--color-danger); }
+
 /* ===== TABLES ===== */
 .table-wrapper {
   overflow-x: auto;

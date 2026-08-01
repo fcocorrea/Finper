@@ -173,7 +173,8 @@ const Dashboard = (() => {
             <div class="card-header"><h3 class="card-title">Evolución de Gastos</h3></div>
             <canvas id="chart-expense-line"></canvas>
           </div>
-        </div>`;
+        </div>
+        ${renderBudgetProgressHTML(month, year)}`;
 
       renderExpenseLineChart(month, year);
       renderBarChart(month, year, 'categoria');
@@ -570,6 +571,42 @@ const Dashboard = (() => {
     return Store.getByMonth('savings', month, year)
       .filter(s => { const p = Store.parseRecordDate('savings', s.fecha); return p && p.day <= day; })
       .reduce((sum, s) => sum + Store.parseCurrency(s.monto), 0);
+  }
+
+  function renderBudgetProgressHTML(month, year) {
+    const budgets = Store.getBudgets();
+    if (!budgets.length) return '';
+
+    const spentByCategory = {};
+    Store.getByMonth('expenses', month, year).forEach(e => {
+      spentByCategory[e.categoria] = (spentByCategory[e.categoria] || 0) + Store.parseCurrency(e.gasto);
+    });
+
+    const rows = budgets
+      .map(b => {
+        const spent = spentByCategory[b.categoria] || 0;
+        const budget = Store.parseCurrency(b.monto);
+        return { categoria: b.categoria, spent, budget, pct: budget > 0 ? (spent / budget) * 100 : 0 };
+      })
+      .sort((a, b) => b.pct - a.pct);
+
+    const rowsHTML = rows.map(r => {
+      const level = r.pct >= 100 ? 'danger' : r.pct >= 80 ? 'warning' : 'success';
+      return `
+        <div class="budget-row">
+          <div class="budget-row-header">
+            <span class="budget-row-category">${r.categoria}</span>
+            <span class="budget-row-amounts">${UI.formatCLP(r.spent)} / ${UI.formatCLP(r.budget)}</span>
+          </div>
+          <div class="budget-bar"><div class="budget-bar-fill ${level}" style="width:${Math.min(r.pct, 100)}%"></div></div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="chart-container fade-in" style="margin-bottom:var(--space-6)">
+        <div class="card-header"><h3 class="card-title">Presupuesto por Categoría</h3></div>
+        ${rowsHTML}
+      </div>`;
   }
 
   function renderExpenseLineChart(month, year) {

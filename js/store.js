@@ -17,6 +17,7 @@ const Store = (() => {
     accountTypes: 'finper_account_types',
     incomeSources: 'finper_income_sources',
     savingsCategories: 'finper_savings_categories',
+    budgets: 'finper_budgets',
   };
 
   const DEFAULT_CATEGORIES = [
@@ -94,6 +95,7 @@ const Store = (() => {
     if (!_get(KEYS.incomes)) _set(KEYS.incomes, []);
     if (!_get(KEYS.accounts)) _set(KEYS.accounts, []);
     if (!_get(KEYS.savings)) _set(KEYS.savings, []);
+    if (!_get(KEYS.budgets)) _set(KEYS.budgets, []);
     if (!_get(KEYS.incomeSources)) _set(KEYS.incomeSources, []);
     if (!_get(KEYS.savingsCategories)) _set(KEYS.savingsCategories, DEFAULT_SAVINGS_CATEGORIES);
     const _sc = _get(KEYS.savingsCategories);
@@ -215,6 +217,8 @@ const Store = (() => {
     if (expenses.some(e => e.categoria === name)) return { error: 'in_use' };
     let cats = getCategories().filter(c => c !== name);
     _set(KEYS.categories, cats);
+    const budget = getBudgets().find(b => b.categoria === name);
+    if (budget) remove('budgets', budget.id);
     return { success: true };
   }
   function renameCategory(oldName, newName) {
@@ -227,7 +231,26 @@ const Store = (() => {
     const expenses = getAll('expenses');
     expenses.forEach(e => { if (e.categoria === oldName) e.categoria = newName; });
     _set(KEYS.expenses, expenses);
+    const budget = getBudgets().find(b => b.categoria === oldName);
+    if (budget) update('budgets', budget.id, { categoria: newName });
     return true;
+  }
+
+  // ---------- BUDGETS ----------
+  function getBudgets() { return getAll('budgets'); }
+  function getBudgetForCategory(categoria) {
+    const budget = getBudgets().find(b => b.categoria === categoria);
+    return budget ? parseCurrency(budget.monto) : 0;
+  }
+  function setBudget(categoria, monto) {
+    const amount = parseCurrency(monto);
+    const existing = getBudgets().find(b => b.categoria === categoria);
+    if (amount <= 0) {
+      if (existing) remove('budgets', existing.id);
+      return;
+    }
+    if (existing) update('budgets', existing.id, { monto: amount });
+    else add('budgets', { categoria, monto: amount });
   }
 
   // ---------- EXPENSE TYPES ----------
@@ -395,6 +418,7 @@ const Store = (() => {
     getSuggestions, predictCategory,
     setDateMode, getByMonths, getByMonth, parseRecordDate,
     getTotalIncome, getTotalExpenses, getTotalSavings, parseCurrency,
+    getBudgets, getBudgetForCategory, setBudget,
     DEFAULT_COLUMNS,
   };
 })();

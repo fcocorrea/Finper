@@ -65,6 +65,10 @@ const Editor = (() => {
         <div class="type-card" data-action="edit-categories">
           <div class="type-card-icon"></div>
           <div class="type-card-label">Editar categorías</div>
+        </div>
+        <div class="type-card" data-action="edit-budgets">
+          <div class="type-card-icon"></div>
+          <div class="type-card-label">Editar presupuestos</div>
         </div>`;
     }
     if (dataType === 'savings') {
@@ -87,6 +91,7 @@ const Editor = (() => {
         else if (action === 'add-col') renderAddColumn(dataType);
         else if (action === 'remove-col') renderRemoveColumn(dataType);
         else if (action === 'edit-categories') renderEditCategories();
+        else if (action === 'edit-budgets') renderEditBudgets();
         else if (action === 'edit-savings-categories') renderEditSavingsCategories();
       });
     });
@@ -263,6 +268,41 @@ const Editor = (() => {
     }
 
     renderList();
+  }
+
+  // ---------- EDIT BUDGETS ----------
+  function renderEditBudgets() {
+    const content = document.getElementById('editor-content');
+
+    let html = `
+      <button class="btn btn-ghost btn-sm" id="editor-back">← Volver</button>
+      <h3 style="margin:var(--space-4) 0">Editar presupuestos por categoría</h3>
+      <p class="form-label" style="margin-bottom:var(--space-4)">Monto mensual por categoría. Déjalo en 0 para quitar el presupuesto.</p>
+      <div style="max-height:400px;overflow-y:auto">
+    `;
+    Store.getCategories().forEach(cat => {
+      const current = Store.getBudgetForCategory(cat);
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--color-border)">
+        <span>${cat}</span>
+        <input class="form-input budget-input" data-cat="${cat}" type="text" style="max-width:150px" value="${current || ''}" placeholder="0 o =1500+2300" />
+      </div>`;
+    });
+    html += `</div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="save-budgets-btn">Guardar</button>
+      </div>`;
+    content.innerHTML = html;
+
+    document.getElementById('editor-back').addEventListener('click', () => renderStep2('expenses'));
+    content.querySelectorAll('.budget-input').forEach(input => UI.enableFormulaInput(input));
+
+    document.getElementById('save-budgets-btn').addEventListener('click', () => {
+      content.querySelectorAll('.budget-input').forEach(input => {
+        Store.setBudget(input.dataset.cat, input.value);
+      });
+      UI.toast('Presupuestos guardados', 'success');
+      renderStep2('expenses');
+    });
   }
 
   // ---------- EDIT SAVINGS CATEGORIES ----------
