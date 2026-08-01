@@ -328,20 +328,25 @@ const Store = (() => {
     });
   }
 
+  // Accepts a 2-digit ("26") or 4-digit ("2026") year segment.
+  function _fullYear(y) {
+    return y.length === 4 ? parseInt(y) : 2000 + parseInt(y);
+  }
+
   function parseRecordDate(type, dateStr) {
     if (!dateStr) return null;
     const parts = dateStr.split('-');
     if (type === 'incomes') {
       if (parts.length === 2) {
-        return { month: parseInt(parts[0]), year: 2000 + parseInt(parts[1]) };
+        return { month: parseInt(parts[0]), year: _fullYear(parts[1]) };
       }
     } else {
       // expenses, savings, accounts: dd-mm-yy or mm-yy (mesPago)
       if (parts.length === 3) {
-        return { day: parseInt(parts[0]), month: parseInt(parts[1]), year: 2000 + parseInt(parts[2]) };
+        return { day: parseInt(parts[0]), month: parseInt(parts[1]), year: _fullYear(parts[2]) };
       }
       if (parts.length === 2) {
-        return { month: parseInt(parts[0]), year: 2000 + parseInt(parts[1]) };
+        return { month: parseInt(parts[0]), year: _fullYear(parts[1]) };
       }
     }
     return null;

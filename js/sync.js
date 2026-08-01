@@ -24,10 +24,15 @@ const Sync = (() => {
 
   // ── Date helpers ──────────────────────────────────────────────
 
+  // Accepts a 2-digit ("26") or 4-digit ("2026") year segment.
+  function _fullYear(y) {
+    return y.length === 4 ? y : `20${y}`;
+  }
+
   function _dmyToISO(s) {
     // '31-05-26' → '2026-05-31'
     const [d, m, y] = s.split('-');
-    return `20${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    return `${_fullYear(y)}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
 
   function _isoToDMY(s) {
@@ -39,7 +44,7 @@ const Sync = (() => {
   function _myToISO(s) {
     // '05-26' → '2026-05-01'
     const [m, y] = s.split('-');
-    return `20${y}-${m.padStart(2, '0')}-01`;
+    return `${_fullYear(y)}-${m.padStart(2, '0')}-01`;
   }
 
   // ── medio_pago case normalization ─────────────────────────────
