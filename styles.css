@@ -464,6 +464,15 @@ body {
   color: var(--color-muted);
 }
 
+.budget-row-link {
+  cursor: pointer;
+}
+
+.budget-row-link:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+}
+
 .budget-row-amounts {
   color: var(--color-muted);
 }

@@ -76,7 +76,9 @@ const TableView = (() => {
       : Store.getByMonths(dataType, months);
 
     if (drillFilter) {
-      data = data.filter(row => row[drillFilter.key] === drillFilter.value);
+      data = Array.isArray(drillFilter.value)
+        ? data.filter(row => drillFilter.value.includes(row[drillFilter.key]))
+        : data.filter(row => row[drillFilter.key] === drillFilter.value);
     }
 
     if (!data.length) {
@@ -228,7 +230,7 @@ const TableView = (() => {
 
   function renderDrillBadge(drillFilter) {
     return `<div class="drill-filter-badge">
-      Filtro activo: <strong>${drillFilter.value}</strong>
+      Filtro activo: <strong>${drillFilter.label || drillFilter.value}</strong>
       <button class="btn-icon btn-ghost" id="clear-drill-filter" title="Quitar filtro">✕</button>
     </div>`;
   }

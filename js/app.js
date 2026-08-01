@@ -652,6 +652,20 @@ const App = (() => {
     refresh();
   }
 
+  // Jumps to the Gastos table filtered to a budget group's categories.
+  function drillDownToExpenses(categorias, label) {
+    state.dataType = 'expenses';
+    state.viewMode = 'table';
+    state.drillFilter = { key: 'categoria', value: categorias, label };
+    document.querySelectorAll('#data-type-toggle .toggle-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.type === 'expenses');
+    });
+    document.querySelectorAll('#view-mode-toggle .toggle-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.view === 'table');
+    });
+    refresh();
+  }
+
   function clearDrillFilter() {
     state.drillFilter = null;
     refresh();
@@ -673,7 +687,7 @@ const App = (() => {
     });
   }
 
-  return { init, refresh, drillDown, clearDrillFilter, getActiveMonths };
+  return { init, refresh, drillDown, drillDownToExpenses, clearDrillFilter, getActiveMonths };
 })();
 
 // Boot

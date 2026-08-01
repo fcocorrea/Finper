@@ -605,7 +605,7 @@ const Dashboard = (() => {
         const spent = categorias.reduce((s, cat) =>
           s + months.reduce((s2, { month, year }) => s2 + getCategorySpend(cat, month, year), 0), 0);
         const target = Math.round(totalIncome * (parseFloat(g.porcentaje) || 0) / 100);
-        return { nombre: g.nombre, porcentaje: g.porcentaje, spent, target, pct: target > 0 ? (spent / target) * 100 : 0 };
+        return { id: g.id, nombre: g.nombre, porcentaje: g.porcentaje, categorias, spent, target, pct: target > 0 ? (spent / target) * 100 : 0 };
       })
       .sort((a, b) => b.pct - a.pct);
 
@@ -624,7 +624,10 @@ const Dashboard = (() => {
       return `
         <div class="budget-row">
           <div class="budget-row-header">
-            <span class="budget-row-category">${r.nombre} <span class="budget-row-pct">(${r.porcentaje}%)</span></span>
+            <span class="budget-row-category">
+              <span class="budget-row-link" data-group-id="${r.id}">${r.nombre}</span>
+              <span class="budget-row-pct">(${r.porcentaje}%)</span>
+            </span>
             <span class="budget-row-amounts">${UI.formatCLP(r.spent)} / ${UI.formatCLP(r.target)}</span>
           </div>
           <div class="budget-bar"><div class="budget-bar-fill ${level}" style="width:${Math.min(r.pct, 100)}%"></div></div>
@@ -666,6 +669,13 @@ const Dashboard = (() => {
         ${rowsHTML}
       </div>
       ${unassignedHTML}`;
+
+    container.querySelectorAll('.budget-row-link').forEach(el => {
+      el.addEventListener('click', () => {
+        const group = rows.find(r => r.id === el.dataset.groupId);
+        if (group) App.drillDownToExpenses(group.categorias, group.nombre);
+      });
+    });
   }
 
   function renderExpenseLineChart(month, year) {
