@@ -198,6 +198,10 @@ const TableView = (() => {
     const modal = document.getElementById('modal-edit-row');
     document.getElementById('edit-row-form').innerHTML = formHTML;
 
+    columns.forEach(col => {
+      if (col.type === 'currency') UI.enableFormulaInput(modal.querySelector(`[data-key="${col.key}"]`));
+    });
+
     document.getElementById('edit-row-save').onclick = () => {
       const updates = {};
       modal.querySelectorAll('[data-key]').forEach(el => {

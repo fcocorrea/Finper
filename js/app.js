@@ -42,6 +42,12 @@ const App = (() => {
 
   function refresh() {
     updateMonthDisplay();
+
+    // "Resumen" is a dashboard-only overview — it has no table/pivot representation.
+    const isResumen = state.dataType === 'resumen';
+    document.getElementById('view-mode-toggle').classList.toggle('hidden', isResumen);
+    if (isResumen) state.viewMode = 'dashboard';
+
     const { dataType, viewMode } = state;
     const months = getActiveMonths();
 
@@ -217,7 +223,7 @@ const App = (() => {
         </div>
         <div class="form-group">
           <label class="form-label">Monto (CLP)</label>
-          <input class="form-input" id="add-monto" type="number" placeholder="0" />
+          <input class="form-input" id="add-monto" type="text" placeholder="0 o =1500+2300" />
         </div>
         <div class="form-group autocomplete-wrapper">
           <label class="form-label">Fuente</label>
@@ -230,6 +236,7 @@ const App = (() => {
         </div>
       `;
 
+      UI.enableFormulaInput(document.getElementById('add-monto'));
       UI.setupAutocomplete(
         document.getElementById('add-fuente'),
         () => Store.getSuggestions('incomes', 'fuente'),
@@ -274,7 +281,7 @@ const App = (() => {
         </div>
         <div class="form-group">
           <label class="form-label">Gasto (CLP)</label>
-          <input class="form-input" id="add-gasto" type="number" placeholder="0" />
+          <input class="form-input" id="add-gasto" type="text" placeholder="0 o =1500+2300" />
         </div>
         <div class="form-group autocomplete-wrapper">
           <label class="form-label">Comentario</label>
@@ -304,6 +311,7 @@ const App = (() => {
       UI.renderSelectOptions(document.getElementById('add-categoria'), Store.getCategories(), 'Seleccionar categoría...');
       UI.renderSelectOptions(document.getElementById('add-tipo'), Store.getExpenseTypes(), 'Seleccionar tipo...');
       UI.renderSelectOptions(document.getElementById('add-medioPago'), Store.getPaymentMethods(), 'Seleccionar medio...');
+      UI.enableFormulaInput(document.getElementById('add-gasto'));
 
       // Show cuotas field when "Tarjeta de crédito en cuotas" is selected
       document.getElementById('add-medioPago').addEventListener('change', (e) => {
@@ -423,7 +431,7 @@ const App = (() => {
           </div>
           <div class="form-group">
             <label class="form-label">Monto (CLP)</label>
-            <input class="form-input" id="add-monto" type="number" placeholder="0" />
+            <input class="form-input" id="add-monto" type="text" placeholder="0 o =1500+2300" />
           </div>
         </div>
         <div class="modal-footer">
@@ -434,6 +442,7 @@ const App = (() => {
       `;
 
       UI.renderSelectOptions(document.getElementById('add-tipo'), Store.getAccountTypes(), 'Seleccionar tipo...');
+      UI.enableFormulaInput(document.getElementById('add-monto'));
       UI.setupAutocomplete(
         document.getElementById('add-persona'),
         () => Store.getSuggestions('accounts', 'persona'),
@@ -479,7 +488,7 @@ const App = (() => {
         </div>
         <div class="form-group">
           <label class="form-label">Monto (CLP)</label>
-          <input class="form-input" id="add-monto" type="number" placeholder="0" />
+          <input class="form-input" id="add-monto" type="text" placeholder="0 o =1500+2300" />
         </div>
         <div class="form-group">
           <label class="form-label">Descripción</label>
@@ -497,6 +506,7 @@ const App = (() => {
       `;
 
       UI.renderSelectOptions(document.getElementById('add-categoria'), Store.getSavingsCategories(), 'Seleccionar categoría...');
+      UI.enableFormulaInput(document.getElementById('add-monto'));
       UI.setupAutocomplete(
         document.getElementById('add-institucion'),
         () => Store.getSuggestions('savings', 'institucion'),

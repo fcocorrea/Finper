@@ -78,11 +78,16 @@ const UI = (() => {
     return `${mm}-${yy}`;
   }
 
+  // Accepts a 2-digit ("26") or 4-digit ("2026") year segment.
+  function _fullYear(y) {
+    return y.length === 4 ? parseInt(y) : 2000 + parseInt(y);
+  }
+
   function parseDateDMY(str) {
     if (!str) return null;
     const parts = str.split('-');
     if (parts.length === 3) {
-      return new Date(2000 + parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      return new Date(_fullYear(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
     }
     return null;
   }
@@ -91,7 +96,7 @@ const UI = (() => {
     if (!str) return null;
     const parts = str.split('-');
     if (parts.length === 2) {
-      return new Date(2000 + parseInt(parts[1]), parseInt(parts[0]) - 1, 1);
+      return new Date(_fullYear(parts[1]), parseInt(parts[0]) - 1, 1);
     }
     return null;
   }
@@ -177,6 +182,41 @@ const UI = (() => {
     }
   }
 
+  // ---------- FORMULA INPUT (Excel-style arithmetic) ----------
+  // Typing "=1500+2300" and leaving the field evaluates it to "3800".
+  function enableFormulaInput(inputEl) {
+    if (!inputEl) return;
+    inputEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && inputEl.value.trim().startsWith('=')) {
+        e.preventDefault();
+        _evaluateFormula(inputEl);
+      }
+    });
+    inputEl.addEventListener('blur', () => _evaluateFormula(inputEl));
+  }
+
+  function _evaluateFormula(inputEl) {
+    const raw = inputEl.value.trim();
+    if (!raw.startsWith('=')) return;
+    const expr = raw.slice(1);
+    if (!expr || !/^[0-9+\-*/(). ]+$/.test(expr)) {
+      toast('Fórmula inválida', 'warning');
+      return;
+    }
+    let result;
+    try {
+      result = Function(`"use strict"; return (${expr});`)();
+    } catch {
+      toast('Fórmula inválida', 'warning');
+      return;
+    }
+    if (typeof result !== 'number' || !isFinite(result)) {
+      toast('Fórmula inválida', 'warning');
+      return;
+    }
+    inputEl.value = String(Math.round(result));
+  }
+
   // ---------- RENDER SELECT OPTIONS ----------
   function renderSelectOptions(selectEl, options, placeholder = 'Seleccionar...') {
     selectEl.innerHTML = `<option value="" disabled selected>${placeholder}</option>`;
@@ -189,6 +229,6 @@ const UI = (() => {
     toast, confirm, openModal, closeModal, closeAllModals,
     formatCLP, formatDateDMY, formatDateMY, parseDateDMY, parseDateMY,
     MONTH_NAMES, getMonthLabel,
-    setupAutocomplete, renderSelectOptions,
+    setupAutocomplete, renderSelectOptions, enableFormulaInput,
   };
 })();
