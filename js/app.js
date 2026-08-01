@@ -43,10 +43,10 @@ const App = (() => {
   function refresh() {
     updateMonthDisplay();
 
-    // "Resumen" is a dashboard-only overview — it has no table/pivot representation.
-    const isResumen = state.dataType === 'resumen';
-    document.getElementById('view-mode-toggle').classList.toggle('hidden', isResumen);
-    if (isResumen) state.viewMode = 'dashboard';
+    // "Resumen" and "Presupuesto" are dashboard-only overviews — no table/pivot representation.
+    const isOverviewOnly = state.dataType === 'resumen' || state.dataType === 'presupuesto';
+    document.getElementById('view-mode-toggle').classList.toggle('hidden', isOverviewOnly);
+    if (isOverviewOnly) state.viewMode = 'dashboard';
 
     const { dataType, viewMode } = state;
     const months = getActiveMonths();

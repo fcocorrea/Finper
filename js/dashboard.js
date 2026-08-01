@@ -7,6 +7,8 @@ const Dashboard = (() => {
     const container = document.getElementById('view-dashboard');
     if (dataType === 'resumen') {
       renderResumenDashboard(container, months);
+    } else if (dataType === 'presupuesto') {
+      renderPresupuestoDashboard(container, months);
     } else if (dataType === 'incomes') {
       renderIncomesDashboard(container, months);
     } else if (dataType === 'accounts') {
@@ -173,8 +175,7 @@ const Dashboard = (() => {
             <div class="card-header"><h3 class="card-title">Evolución de Gastos</h3></div>
             <canvas id="chart-expense-line"></canvas>
           </div>
-        </div>
-        ${renderBudgetProgressHTML(month, year)}`;
+        </div>`;
 
       renderExpenseLineChart(month, year);
       renderBarChart(month, year, 'categoria');
@@ -573,22 +574,38 @@ const Dashboard = (() => {
       .reduce((sum, s) => sum + Store.parseCurrency(s.monto), 0);
   }
 
-  function renderBudgetProgressHTML(month, year) {
+  // ---------- PRESUPUESTO ----------
+  function renderPresupuestoDashboard(container, months) {
     const budgets = Store.getBudgets();
-    if (!budgets.length) return '';
+    if (!budgets.length) {
+      container.innerHTML = `
+        <div class="empty-state fade-in">
+          <div class="empty-state-text">No hay presupuestos configurados</div>
+          <div class="empty-state-hint">Ve a Edición → Gastos → Editar presupuestos para definir montos por categoría</div>
+        </div>`;
+      return;
+    }
+
+    const isRange = months.length > 1;
 
     const spentByCategory = {};
-    Store.getByMonth('expenses', month, year).forEach(e => {
-      spentByCategory[e.categoria] = (spentByCategory[e.categoria] || 0) + Store.parseCurrency(e.gasto);
+    months.forEach(({ month, year }) => {
+      Store.getByMonth('expenses', month, year).forEach(e => {
+        spentByCategory[e.categoria] = (spentByCategory[e.categoria] || 0) + Store.parseCurrency(e.gasto);
+      });
     });
 
     const rows = budgets
       .map(b => {
         const spent = spentByCategory[b.categoria] || 0;
-        const budget = Store.parseCurrency(b.monto);
+        const budget = Store.parseCurrency(b.monto) * months.length;
         return { categoria: b.categoria, spent, budget, pct: budget > 0 ? (spent / budget) * 100 : 0 };
       })
       .sort((a, b) => b.pct - a.pct);
+
+    const totalSpent  = rows.reduce((s, r) => s + r.spent, 0);
+    const totalBudget = rows.reduce((s, r) => s + r.budget, 0);
+    const overCount   = rows.filter(r => r.pct >= 100).length;
 
     const rowsHTML = rows.map(r => {
       const level = r.pct >= 100 ? 'danger' : r.pct >= 80 ? 'warning' : 'success';
@@ -602,8 +619,20 @@ const Dashboard = (() => {
         </div>`;
     }).join('');
 
-    return `
-      <div class="chart-container fade-in" style="margin-bottom:var(--space-6)">
+    container.innerHTML = `
+      <div class="metrics-grid fade-in">
+        <div class="metric-card">
+          <div class="metric-label">Presupuesto ${isRange ? `(${months.length} meses)` : 'del Mes'}</div>
+          <div class="metric-value ${totalSpent > totalBudget ? 'negative' : 'positive'}">${UI.formatCLP(totalSpent)}</div>
+          <div class="metric-detail">de ${UI.formatCLP(totalBudget)} presupuestado</div>
+        </div>
+        <div class="metric-card ${overCount > 0 ? 'accent' : 'success'}">
+          <div class="metric-label">Categorías sobre presupuesto</div>
+          <div class="metric-value ${overCount > 0 ? 'negative' : 'positive'}">${overCount} / ${rows.length}</div>
+          <div class="metric-detail">${overCount > 0 ? 'Revisa las categorías en rojo' : 'Todo dentro del presupuesto'}</div>
+        </div>
+      </div>
+      <div class="chart-container fade-in">
         <div class="card-header"><h3 class="card-title">Presupuesto por Categoría</h3></div>
         ${rowsHTML}
       </div>`;
