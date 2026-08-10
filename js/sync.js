@@ -5,7 +5,7 @@
 // On app start, Supabase data is pulled to refresh localStorage so all devices
 // stay in sync.
 //
-// Tables synced: gastos, ingresos, cuentas_por_pagar_cobrar, ahorros, grupos_presupuesto
+// Tables synced: gastos, ingresos, cuentas_por_pagar_cobrar, ahorros
 
 const Sync = (() => {
   const SUPABASE_URL = 'https://cbecdmhrmbncyfkaztrb.supabase.co';
@@ -184,34 +184,11 @@ const Sync = (() => {
     };
   }
 
-  function _rowToBudgetGroup(row) {
-    return {
-      _supabase_id: row.id,
-      nombre:       row.nombre || '',
-      porcentaje:   row.porcentaje,
-      categorias:   row.categorias || [],
-      _created:     row.created_at,
-      _updated:     row.updated_at,
-    };
-  }
-
-  function _budgetGroupToDB(r) {
-    if (!r.nombre) return null;
-    const userId = Auth.getCurrentUserId();
-    return {
-      user_id:    userId,
-      nombre:     r.nombre,
-      porcentaje: parseFloat(r.porcentaje) || 0,
-      categorias: r.categorias || [],
-    };
-  }
-
   const _TABLES = {
     expenses:     { table: 'gastos',                   toDB: _expenseToDB,     toApp: _rowToExpense     },
     incomes:      { table: 'ingresos',                 toDB: _incomeToDB,      toApp: _rowToIncome      },
     accounts:     { table: 'cuentas_por_pagar_cobrar', toDB: _accountToDB,     toApp: _rowToAccount     },
     savings:      { table: 'ahorros',                  toDB: _savingsToDB,     toApp: _rowToSavings     },
-    budgetGroups: { table: 'grupos_presupuesto',       toDB: _budgetGroupToDB, toApp: _rowToBudgetGroup },
   };
 
   // ── Ensure categories exist in Supabase ──────────────────────
@@ -274,12 +251,11 @@ const Sync = (() => {
     try {
       await _loadCategories();
 
-      const [expRes, incRes, accRes, savRes, budRes] = await Promise.all([
+      const [expRes, incRes, accRes, savRes] = await Promise.all([
         _db.from('gastos').select('*, categorias_gastos(nombre)').order('fecha', { ascending: false }),
         _db.from('ingresos').select('*').order('fecha', { ascending: false }),
         _db.from('cuentas_por_pagar_cobrar').select('*').order('fecha', { ascending: false }),
         _db.from('ahorros').select('*').order('fecha', { ascending: false }),
-        _db.from('grupos_presupuesto').select('*'),
       ]);
 
       let ok = true;
@@ -310,13 +286,6 @@ const Sync = (() => {
         console.error('[Sync] pull savings:', savRes.error.message);
       } else {
         _mergeIntoStorage('finper_savings', savRes.data.map(r => ({ id: _newId(), ..._rowToSavings(r) })));
-      }
-
-      if (budRes.error) {
-        ok = false;
-        console.error('[Sync] pull budget groups:', budRes.error.message);
-      } else {
-        _mergeIntoStorage('finper_budget_groups', budRes.data.map(r => ({ id: _newId(), ..._rowToBudgetGroup(r) })));
       }
 
       return ok;

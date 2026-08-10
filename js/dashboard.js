@@ -34,9 +34,7 @@ const Dashboard = (() => {
       const today = new Date();
       const daysInMonth  = new Date(year, month, 0).getDate();
       const currentDay   = (today.getFullYear() === year && today.getMonth() + 1 === month) ? today.getDate() : daysInMonth;
-      const remainingDays = daysInMonth - currentDay;
       const remainingAfterSavings = totalIncome - totalExpense - totalSavings;
-      const dailyBudget  = remainingDays > 0 ? Math.round(remainingAfterSavings / remainingDays) : remainingAfterSavings;
       let prevMonth = month - 1, prevYear = year;
       if (prevMonth < 1) { prevMonth = 12; prevYear--; }
       const prevExpenses    = getExpensesToDay(prevMonth, prevYear, currentDay) + getSavingsToDay(prevMonth, prevYear, currentDay);
@@ -51,9 +49,9 @@ const Dashboard = (() => {
             <div class="metric-detail">${UI.formatCLP(totalExpense)} de ${UI.formatCLP(totalIncome)}</div>
           </div>
           <div class="metric-card accent">
-            <div class="metric-label">Presupuesto Diario</div>
-            <div class="metric-value ${dailyBudget < 0 ? 'negative' : 'positive'}">${UI.formatCLP(dailyBudget)}</div>
-            <div class="metric-detail">${remainingDays} días restantes del mes</div>
+            <div class="metric-label">Remanente del Mes</div>
+            <div class="metric-value ${remainingAfterSavings < 0 ? 'negative' : 'positive'}">${UI.formatCLP(remainingAfterSavings)}</div>
+            <div class="metric-detail">Ingresos – Gastos – Ahorros</div>
           </div>
           <div class="metric-card success">
             <div class="metric-label">vs. Mes Anterior (día ${currentDay})</div>
@@ -65,10 +63,6 @@ const Dashboard = (() => {
           <div class="chart-container">
             <div class="card-header"><h3 class="card-title">Ingreso vs Gasto vs Ahorro</h3></div>
             <canvas id="chart-resumen-totals"></canvas>
-            <div class="chart-balance ${remainingAfterSavings >= 0 ? 'positive' : 'negative'}">
-              <span class="chart-balance-label">Remanente del mes</span>
-              <span class="chart-balance-value">${UI.formatCLP(remainingAfterSavings)}</span>
-            </div>
           </div>
         </div>`;
 
@@ -574,108 +568,96 @@ const Dashboard = (() => {
       .reduce((sum, s) => sum + Store.parseCurrency(s.monto), 0);
   }
 
-  // ---------- PRESUPUESTO ("5 facetas") ----------
-  function getCategorySpend(categoria, month, year) {
-    const gasto = Store.getByMonth('expenses', month, year)
-      .filter(e => e.categoria === categoria)
-      .reduce((s, e) => s + Store.parseCurrency(e.gasto), 0);
-    const ahorro = Store.getByMonth('savings', month, year)
-      .filter(r => r.categoria === categoria)
-      .reduce((s, r) => s + Store.parseCurrency(r.monto), 0);
-    return gasto + ahorro;
+  // ---------- PRESUPUESTO ----------
+  // Only 'Variable' expenses count — fixed ones are predictable and not budgeted.
+  function isVariable(e) { return e.tipo === 'Variable'; }
+
+  function variableSpendBetween(start, end) {
+    return Store.getAll('expenses').reduce((sum, e) => {
+      if (!isVariable(e)) return sum;
+      const p = Store.parseRecordDate('expenses', e.fecha);
+      if (!p || !p.day) return sum;
+      const d = new Date(p.year, p.month - 1, p.day);
+      return d >= start && d <= end ? sum + Store.parseCurrency(e.gasto) : sum;
+    }, 0);
   }
 
+  function budgetBar(titulo, periodo, spent, target) {
+    const pct = target > 0 ? (spent / target) * 100 : 0;
+    const level = pct >= 100 ? 'danger' : pct >= 80 ? 'warning' : 'success';
+    const rest = target - spent;
+    return `
+      <div class="budget-row">
+        <div class="budget-row-header">
+          <span class="budget-row-category">${titulo} <span class="budget-row-pct">${periodo}</span></span>
+          <span class="budget-row-amounts">${UI.formatCLP(spent)} / ${UI.formatCLP(target)}</span>
+        </div>
+        <div class="budget-bar"><div class="budget-bar-fill ${level}" style="width:${Math.min(pct, 100)}%"></div></div>
+        <div class="metric-detail">${pct.toFixed(0)}% usado · ${rest >= 0 ? `quedan ${UI.formatCLP(rest)}` : `excedido en ${UI.formatCLP(-rest)}`}</div>
+      </div>`;
+  }
+
+  const _DAY_FMT = d => `${String(d.getDate()).padStart(2, '0')} ${UI.MONTH_NAMES[d.getMonth()].slice(0, 3).toLowerCase()}`;
+
   function renderPresupuestoDashboard(container, months) {
-    const groups = Store.getBudgetGroups();
-    if (!groups.length) {
-      container.innerHTML = `
-        <div class="empty-state fade-in">
-          <div class="empty-state-text">No hay grupos de presupuesto configurados</div>
-          <div class="empty-state-hint">Ve a Edición → Presupuesto (5 facetas) para crear tus grupos</div>
-        </div>`;
-      return;
-    }
+    const monthlyBudget = Store.getMonthlyBudget();
+    const monthTarget = monthlyBudget * months.length;
+    const monthSpent = Store.getByMonths('expenses', months)
+      .filter(isVariable)
+      .reduce((s, e) => s + Store.parseCurrency(e.gasto), 0);
 
-    const isRange = months.length > 1;
-    const totalIncome = months.reduce((s, { month, year }) => s + Store.getTotalIncome(month, year), 0);
+    // Week and day are anchored to today when the selected period is the current
+    // month; otherwise to the last day of the last selected month.
+    const today = new Date();
+    const last = months[months.length - 1];
+    const daysInMonth = new Date(last.year, last.month, 0).getDate();
+    const isCurrent = today.getFullYear() === last.year && today.getMonth() + 1 === last.month;
+    const anchor = isCurrent
+      ? new Date(today.getFullYear(), today.getMonth(), today.getDate())
+      : new Date(last.year, last.month - 1, daysInMonth);
 
-    const rows = groups
-      .map(g => {
-        const categorias = g.categorias || [];
-        const spent = categorias.reduce((s, cat) =>
-          s + months.reduce((s2, { month, year }) => s2 + getCategorySpend(cat, month, year), 0), 0);
-        const target = Math.round(totalIncome * (parseFloat(g.porcentaje) || 0) / 100);
-        return { id: g.id, nombre: g.nombre, porcentaje: g.porcentaje, categorias, spent, target, pct: target > 0 ? (spent / target) * 100 : 0 };
-      })
-      .sort((a, b) => b.pct - a.pct);
+    const dayTarget  = Math.round(monthlyBudget / daysInMonth);
+    const weekTarget = Math.round(monthlyBudget * 7 / daysInMonth);
 
-    const assignedCategorias = new Set(groups.flatMap(g => g.categorias || []));
-    const unassigned = [...Store.getCategories(), ...Store.getSavingsCategories()]
-      .filter(cat => !assignedCategorias.has(cat))
-      .map(cat => ({ categoria: cat, spent: months.reduce((s, { month, year }) => s + getCategorySpend(cat, month, year), 0) }))
-      .filter(r => r.spent > 0);
+    const weekStart = new Date(anchor);
+    weekStart.setDate(anchor.getDate() - ((anchor.getDay() + 6) % 7));
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
 
-    const totalSpent  = rows.reduce((s, r) => s + r.spent, 0);
-    const pctSum      = groups.reduce((s, g) => s + (parseFloat(g.porcentaje) || 0), 0);
-    const overCount   = rows.filter(r => r.pct >= 100).length;
+    const weekSpent = variableSpendBetween(weekStart, weekEnd);
+    const daySpent  = variableSpendBetween(anchor, anchor);
 
-    const rowsHTML = rows.map(r => {
-      const level = r.pct >= 100 ? 'danger' : r.pct >= 80 ? 'warning' : 'success';
-      return `
-        <div class="budget-row">
-          <div class="budget-row-header">
-            <span class="budget-row-category">
-              <span class="budget-row-link" data-group-id="${r.id}">${r.nombre}</span>
-              <span class="budget-row-pct">(${r.porcentaje}%)</span>
-            </span>
-            <span class="budget-row-amounts">${UI.formatCLP(r.spent)} / ${UI.formatCLP(r.target)}</span>
-          </div>
-          <div class="budget-bar"><div class="budget-bar-fill ${level}" style="width:${Math.min(r.pct, 100)}%"></div></div>
-        </div>`;
-    }).join('');
-
-    const unassignedHTML = unassigned.length ? `
-      <div class="chart-container fade-in" style="margin-top:var(--space-6)">
-        <div class="card-header"><h3 class="card-title">Sin grupo asignado</h3></div>
-        ${unassigned.map(r => `
-          <div class="budget-row">
-            <div class="budget-row-header">
-              <span class="budget-row-category">${r.categoria}</span>
-              <span class="budget-row-amounts">${UI.formatCLP(r.spent)}</span>
-            </div>
-          </div>`).join('')}
-      </div>` : '';
+    const monthLabel = months.length > 1
+      ? `${UI.getMonthLabel(months[0].month, months[0].year)} – ${UI.getMonthLabel(last.month, last.year)}`
+      : UI.getMonthLabel(last.month, last.year);
 
     container.innerHTML = `
       <div class="metrics-grid fade-in">
-        <div class="metric-card">
-          <div class="metric-label">Ingreso ${isRange ? `(${months.length} meses)` : 'del Mes'}</div>
-          <div class="metric-value positive">${UI.formatCLP(totalIncome)}</div>
-          <div class="metric-detail">${UI.formatCLP(totalSpent)} distribuido en grupos</div>
-        </div>
-        <div class="metric-card ${overCount > 0 ? 'accent' : 'success'}">
-          <div class="metric-label">Grupos sobre presupuesto</div>
-          <div class="metric-value ${overCount > 0 ? 'negative' : 'positive'}">${overCount} / ${rows.length}</div>
-          <div class="metric-detail">${overCount > 0 ? 'Revisa los grupos en rojo' : 'Todo dentro del presupuesto'}</div>
+        <div class="metric-card accent">
+          <div class="metric-label">Presupuesto Mensual</div>
+          <div class="metric-value">${UI.formatCLP(monthlyBudget)}</div>
+          <div class="metric-detail">Solo gastos variables · editable en Edición → Presupuesto</div>
         </div>
         <div class="metric-card">
-          <div class="metric-label">Suma de porcentajes</div>
-          <div class="metric-value ${pctSum === 100 ? 'positive' : 'warning'}">${pctSum}%</div>
-          <div class="metric-detail">Editable en Edición → Presupuesto</div>
+          <div class="metric-label">Presupuesto Semanal</div>
+          <div class="metric-value">${UI.formatCLP(weekTarget)}</div>
+          <div class="metric-detail">${UI.formatCLP(dayTarget)} × 7 días</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Presupuesto Diario</div>
+          <div class="metric-value">${UI.formatCLP(dayTarget)}</div>
+          <div class="metric-detail">${UI.formatCLP(monthlyBudget)} ÷ ${daysInMonth} días</div>
         </div>
       </div>
       <div class="chart-container fade-in">
-        <div class="card-header"><h3 class="card-title">Presupuesto por Grupo</h3></div>
-        ${rowsHTML}
-      </div>
-      ${unassignedHTML}`;
+        <div class="card-header"><h3 class="card-title">Avance del Presupuesto</h3></div>
+        ${budgetBar('<span class="budget-row-link" id="budget-drill">Mensual</span>', monthLabel, monthSpent, monthTarget)}
+        ${budgetBar('Semanal', `${_DAY_FMT(weekStart)} – ${_DAY_FMT(weekEnd)} ${weekEnd.getFullYear()}`, weekSpent, weekTarget)}
+        ${budgetBar('Diario', `${_DAY_FMT(anchor)} ${anchor.getFullYear()}`, daySpent, dayTarget)}
+      </div>`;
 
-    container.querySelectorAll('.budget-row-link').forEach(el => {
-      el.addEventListener('click', () => {
-        const group = rows.find(r => r.id === el.dataset.groupId);
-        if (group) App.drillDownToExpenses(group.categorias, group.nombre);
-      });
-    });
+    document.getElementById('budget-drill').addEventListener('click', () =>
+      App.drillDownToExpenses({ key: 'tipo', value: 'Variable', label: 'Gastos variables' }));
   }
 
   function renderExpenseLineChart(month, year) {

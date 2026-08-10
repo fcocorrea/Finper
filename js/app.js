@@ -652,11 +652,11 @@ const App = (() => {
     refresh();
   }
 
-  // Jumps to the Gastos table filtered to a budget group's categories.
-  function drillDownToExpenses(categorias, label) {
+  // Jumps to the Gastos table with a filter applied (used from the Presupuesto view).
+  function drillDownToExpenses(filter) {
     state.dataType = 'expenses';
     state.viewMode = 'table';
-    state.drillFilter = { key: 'categoria', value: categorias, label };
+    state.drillFilter = filter;
     document.querySelectorAll('#data-type-toggle .toggle-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.type === 'expenses');
     });

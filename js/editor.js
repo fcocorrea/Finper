@@ -32,15 +32,15 @@ const Editor = (() => {
           <div class="type-card-icon"></div>
           <div class="type-card-label">Ahorros</div>
         </div>
-        <div class="type-card" data-type="__budget_groups">
+        <div class="type-card" data-type="__budget">
           <div class="type-card-icon"></div>
-          <div class="type-card-label">Presupuesto (5 facetas)</div>
+          <div class="type-card-label">Presupuesto</div>
         </div>
       </div>
     `;
     content.querySelectorAll('.type-card').forEach(card => {
       card.addEventListener('click', () => {
-        if (card.dataset.type === '__budget_groups') renderEditBudgetGroups();
+        if (card.dataset.type === '__budget') renderEditBudget();
         else renderStep2(card.dataset.type);
       });
     });
@@ -272,100 +272,25 @@ const Editor = (() => {
     renderList();
   }
 
-  // ---------- EDIT BUDGET GROUPS ("5 facetas") ----------
-  function renderEditBudgetGroups() {
+  // ---------- EDIT MONTHLY BUDGET ----------
+  function renderEditBudget() {
     const content = document.getElementById('editor-content');
-
-    function renderList() {
-      const groups = Store.getBudgetGroups();
-      const sum = groups.reduce((s, g) => s + (parseFloat(g.porcentaje) || 0), 0);
-
-      let html = `
-        <button class="btn btn-ghost btn-sm" id="editor-back">← Volver</button>
-        <h3 style="margin:var(--space-4) 0">Grupos de presupuesto (5 facetas)</h3>
-        <p class="form-label">Cada grupo recibe un % del ingreso mensual. Asigna categorías a cada uno más abajo.</p>
-        <div style="margin:var(--space-3) 0">`;
-
-      groups.forEach(g => {
-        html += `<div style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--color-border)">
-          <input class="form-input group-name-input" data-id="${g.id}" type="text" value="${g.nombre}" style="flex:1" />
-          <div style="display:flex;align-items:center;gap:var(--space-1)">
-            <input class="form-input group-pct-input" data-id="${g.id}" type="number" min="0" max="100" value="${g.porcentaje}" style="width:70px" />
-            <span>%</span>
-          </div>
-          <button class="btn btn-ghost btn-sm group-delete" data-id="${g.id}" title="Eliminar" style="width:auto;padding:0 var(--space-2);font-size:var(--text-xs)">Eliminar</button>
-        </div>`;
-      });
-
-      html += `</div>
-        <div class="metric-detail" style="margin-bottom:var(--space-4)">
-          Suma de porcentajes: <strong style="color:${sum === 100 ? 'var(--color-success)' : 'var(--color-warning)'}">${sum}%</strong>
-          ${sum !== 100 ? ' (no suma 100%, es solo una referencia)' : ''}
-        </div>
-        <div class="form-row" style="margin-bottom:var(--space-6)">
-          <input class="form-input" id="new-group-input" placeholder="Nombre del nuevo grupo..." />
-          <button class="btn btn-accent" id="add-group-btn">Agregar grupo</button>
-        </div>
-        <h3 style="margin-bottom:var(--space-2)">Categorías de Gastos</h3>
-        <div style="max-height:220px;overflow-y:auto;margin-bottom:var(--space-4)">
-          ${Store.getCategories().map(cat => renderCategoryRow(cat, groups)).join('')}
-        </div>
-        <h3 style="margin-bottom:var(--space-2)">Categorías de Ahorro</h3>
-        <div style="max-height:220px;overflow-y:auto">
-          ${Store.getSavingsCategories().map(cat => renderCategoryRow(cat, groups)).join('')}
-        </div>`;
-
-      content.innerHTML = html;
-
-      document.getElementById('editor-back').addEventListener('click', renderStep1);
-
-      content.querySelectorAll('.group-name-input').forEach(input => {
-        input.addEventListener('blur', () => {
-          const val = input.value.trim();
-          if (val) Store.updateBudgetGroup(input.dataset.id, { nombre: val });
-        });
-      });
-      content.querySelectorAll('.group-pct-input').forEach(input => {
-        input.addEventListener('blur', () => {
-          Store.updateBudgetGroup(input.dataset.id, { porcentaje: parseFloat(input.value) || 0 });
-          renderList();
-        });
-      });
-      content.querySelectorAll('.group-delete').forEach(btn => {
-        btn.addEventListener('click', async () => {
-          const ok = await UI.confirm('Eliminar grupo', '¿Eliminar este grupo? Las categorías asignadas quedarán sin grupo.');
-          if (ok) { Store.removeBudgetGroup(btn.dataset.id); renderList(); }
-        });
-      });
-      document.getElementById('add-group-btn').addEventListener('click', () => {
-        const name = document.getElementById('new-group-input').value.trim();
-        if (!name) return;
-        Store.addBudgetGroup(name, 0);
-        renderList();
-      });
-      content.querySelectorAll('.category-group-select').forEach(select => {
-        select.addEventListener('change', () => {
-          Store.assignCategoryToGroup(select.dataset.cat, select.value || null);
-          UI.toast(`"${select.dataset.cat}" asignada`, 'success', 1500);
-        });
-      });
-    }
-
-    function renderCategoryRow(cat, groups) {
-      const current = Store.getGroupForCategory(cat);
-      const options = groups.map(g =>
-        `<option value="${g.id}" ${current?.id === g.id ? 'selected' : ''}>${g.nombre}</option>`
-      ).join('');
-      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);padding:var(--space-2) var(--space-3);border-bottom:1px solid var(--color-border)">
-        <span>${cat}</span>
-        <select class="form-select category-group-select" data-cat="${cat}" style="max-width:180px">
-          <option value="">Sin grupo</option>
-          ${options}
-        </select>
+    content.innerHTML = `
+      <button class="btn btn-ghost btn-sm" id="editor-back">← Volver</button>
+      <h3 style="margin:var(--space-4) 0">Presupuesto mensual</h3>
+      <p class="form-label">Monto mensual para gastos variables. Los presupuestos semanal y diario se derivan de este monto.</p>
+      <div class="form-row" style="margin-top:var(--space-3)">
+        <input class="form-input" id="budget-input" type="number" min="0" step="1000" value="${Store.getMonthlyBudget()}" />
+        <button class="btn btn-accent" id="budget-save">Guardar</button>
       </div>`;
-    }
 
-    renderList();
+    document.getElementById('editor-back').addEventListener('click', renderStep1);
+    document.getElementById('budget-save').addEventListener('click', () => {
+      Store.setMonthlyBudget(document.getElementById('budget-input').value);
+      UI.toast('Presupuesto actualizado', 'success');
+      UI.closeModal('modal-editor');
+      App.refresh();
+    });
   }
 
   // ---------- EDIT SAVINGS CATEGORIES ----------
