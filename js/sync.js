@@ -352,22 +352,31 @@ const Sync = (() => {
 
     if (type === 'expenses') await _ensureCategories(records.map(r => r.categoria));
 
-    const payloads = records.map(r => mapping.toDB(r)).filter(Boolean);
-    if (!payloads.length) return;
+    // Record and payload must stay paired: toDB() can return null, and filtering
+    // the payloads alone would shift them out of step with `records`, stamping
+    // _supabase_id onto the wrong rows.
+    const pairs = records
+      .map(record => ({ record, payload: mapping.toDB(record) }))
+      .filter(p => p.payload);
 
-    const { data, error } = await _db.from(mapping.table).insert(payloads).select('id');
+    const skipped = records.length - pairs.length;
+    if (skipped) console.warn(`[Sync] pushBulkAdd ${type}: ${skipped} registro(s) sin payload válido, no se subieron`);
+    if (!pairs.length) return;
+
+    const { data, error } = await _db.from(mapping.table).insert(pairs.map(p => p.payload)).select('id');
     if (error) { console.error(`[Sync] pushBulkAdd ${type}:`, error.message); return; }
+    if (!data?.length) return;
 
-    if (data?.length) {
-      const key  = `finper_${type}`;
-      const list = JSON.parse(localStorage.getItem(key) || '[]');
-      records.forEach((r, i) => {
-        if (!data[i]?.id) return;
-        const idx = list.findIndex(rec => rec.id === r.id);
-        if (idx !== -1) list[idx]._supabase_id = data[i].id;
-      });
-      localStorage.setItem(key, JSON.stringify(list));
-    }
+    // ponytail: relies on RETURNING echoing the VALUES order, which a plain
+    // multi-row INSERT does. If that ever breaks, insert one row at a time.
+    const key  = `finper_${type}`;
+    const list = JSON.parse(localStorage.getItem(key) || '[]');
+    pairs.forEach(({ record }, i) => {
+      if (!data[i]?.id) return;
+      const idx = list.findIndex(rec => rec.id === record.id);
+      if (idx !== -1) list[idx]._supabase_id = data[i].id;
+    });
+    localStorage.setItem(key, JSON.stringify(list));
   }
 
   return { init, pull, pushAdd, pushUpdate, pushRemove, pushBulkAdd };

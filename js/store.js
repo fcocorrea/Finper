@@ -202,7 +202,10 @@ const Store = (() => {
       added.push(clone);
     });
     _set(KEYS[type], list);
-    if (typeof Sync !== 'undefined') Sync.pushBulkAdd(type, added);
+    // Devuelve la promesa: quien importa debe esperarla, o un reload a destiempo
+    // deja los registros sin _supabase_id y duplicados en el siguiente pull.
+    if (typeof Sync !== 'undefined') return Sync.pushBulkAdd(type, added);
+    return Promise.resolve();
   }
 
   // ---------- CATEGORIES ----------

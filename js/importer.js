@@ -153,6 +153,8 @@ const Importer = (() => {
               if (!MY.test(val)) {
                 throw new Error(`Fecha inválida en columna "${col.label}": "${row[fileH]}" — formato esperado mm-aa`);
               }
+            } else if (colKey === 'medioPago') {
+              val = _canonical(val, Store.getPaymentMethods());
             }
 
             record[colKey] = String(val);
@@ -216,13 +218,21 @@ const Importer = (() => {
       actions.classList.remove('hidden');
       actions.style.display = 'flex';
 
-      document.getElementById('import-confirm').onclick = () => {
+      document.getElementById('import-confirm').onclick = async (e) => {
+        const btn = e.currentTarget;
+        if (btn.disabled) return;
+        btn.disabled = true;
         const type = document.getElementById('import-type').value;
-        Store.bulkAdd(type, pendingRecords);
-        UI.toast(`${pendingRecords.length} registros importados`, 'success');
-        pendingRecords = [];
-        UI.closeModal('modal-import');
-        App.refresh();
+        const total = pendingRecords.length;
+        try {
+          await Store.bulkAdd(type, pendingRecords);
+          UI.toast(`${total} registros importados`, 'success');
+          pendingRecords = [];
+          UI.closeModal('modal-import');
+          App.refresh();
+        } finally {
+          btn.disabled = false;
+        }
       };
     };
 
@@ -264,6 +274,14 @@ const Importer = (() => {
     const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
     const yy = String(d.getUTCFullYear()).slice(-2);
     return `${mm}-${yy}`;
+  }
+
+  // Un respaldo exportado de Supabase trae "Tarjeta de Crédito" y la app usa
+  // "Tarjeta de crédito": sin esto conviven dos variantes del mismo medio de pago.
+  // Un valor desconocido se importa tal cual para no perder el dato.
+  function _canonical(val, options) {
+    const key = UI.normalize(val);
+    return options.find(o => UI.normalize(o) === key) || String(val);
   }
 
   return { open };
