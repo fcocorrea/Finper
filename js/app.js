@@ -36,17 +36,25 @@ const App = (() => {
     bindToolbar();
     bindRangePicker();
     bindCloseModals();
+    Search.init();
     await Store.init();
     refresh();
   }
 
   function refresh() {
+    Search.close();
     updateMonthDisplay();
 
     // "Resumen" and "Presupuesto" are dashboard-only overviews — no table/pivot representation.
     const isOverviewOnly = state.dataType === 'resumen' || state.dataType === 'presupuesto';
     document.getElementById('view-mode-toggle').classList.toggle('hidden', isOverviewOnly);
+    document.getElementById('view-mode-separator').classList.toggle('hidden', isOverviewOnly);
     if (isOverviewOnly) state.viewMode = 'dashboard';
+
+    // El buscador es global, pero vive solo en "Resumen" para no saturar la toolbar.
+    const hideSearch = state.dataType !== 'resumen';
+    document.getElementById('search-wrap').classList.toggle('hidden', hideSearch);
+    document.getElementById('search-separator').classList.toggle('hidden', hideSearch);
 
     const { dataType, viewMode } = state;
     const months = getActiveMonths();

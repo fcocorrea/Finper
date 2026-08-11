@@ -38,6 +38,7 @@ const ModuleName = (() => {
 | `app.js` | State orchestrator — routes to views, binds navbar/toolbar |
 | `dashboard.js` | Metrics + Chart.js charts (line and bar) |
 | `table.js` | Table view and pivot cross-tabulation |
+| `search.js` | Global keyword search across all record types (toolbar input + results table) |
 | `editor.js` | Column and category management (multi-step wizard) |
 | `importer.js` | CSV/XLSX import via SheetJS (drag-and-drop supported) |
 

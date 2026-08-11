@@ -85,7 +85,7 @@
           <button class="toggle-btn" data-view="pivot">Tabla Dinámica</button>
         </div>
 
-        <div class="toolbar-separator"></div>
+        <div class="toolbar-separator" id="view-mode-separator"></div>
 
         <!-- Month Picker -->
         <div class="month-picker-wrap">
@@ -112,12 +112,21 @@
           </div>
           <div class="range-popover hidden" id="range-popover"></div>
         </div>
+
+        <div class="toolbar-separator hidden" id="search-separator"></div>
+
+        <!-- Global Search (solo visible en "Resumen") -->
+        <div class="search-wrap hidden" id="search-wrap">
+          <input class="search-input" id="global-search" type="text" autocomplete="off"
+            placeholder="Buscar gastos, ingresos, cuentas..." aria-label="Buscar movimientos" />
+        </div>
       </div>
 
       <!-- ===== VIEWS ===== -->
       <div id="view-dashboard"></div>
       <div id="view-table" class="hidden"></div>
       <div id="view-pivot" class="hidden"></div>
+      <div id="view-search" class="hidden"></div>
     </div>
   </div>
 
@@ -213,6 +222,7 @@
   <script src="js/auth.js"></script>
   <script src="js/dashboard.js"></script>
   <script src="js/table.js"></script>
+  <script src="js/search.js"></script>
   <script src="js/editor.js"></script>
   <script src="js/importer.js"></script>
   <script src="js/archivo.js"></script>

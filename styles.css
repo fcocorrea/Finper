@@ -648,15 +648,21 @@ body {
   margin-bottom: var(--space-3);
 }
 
-.drill-filter-badge #clear-drill-filter {
+.drill-filter-badge .btn-icon {
   color: #fff;
   opacity: 0.8;
   font-size: var(--text-base);
   line-height: 1;
 }
 
-.drill-filter-badge #clear-drill-filter:hover {
+.drill-filter-badge .btn-icon:hover {
   opacity: 1;
+}
+
+.search-count {
+  margin-left: auto;
+  opacity: 0.85;
+  font-size: var(--text-xs);
 }
 
 /* ===== FORMS / INPUTS ===== */
@@ -775,6 +781,44 @@ body {
 .autocomplete-item.highlighted {
   background: rgba(74, 124, 247, 0.08);
   color: var(--color-primary);
+}
+
+/* ===== GLOBAL SEARCH ===== */
+.search-wrap {
+  position: relative;
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.search-input {
+  width: 100%;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-4) var(--space-2) 34px;
+  font-size: var(--text-sm);
+  font-family: var(--font-family);
+  color: var(--color-text);
+  transition: border-color var(--transition-fast);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%236b7280' stroke-width='2' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='M20 20l-4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 12px center;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(74, 124, 247, 0.18);
+}
+
+.search-input::placeholder {
+  color: var(--color-muted);
+}
+
+.search-detail {
+  white-space: normal;
+  max-width: 380px;
+  color: var(--color-muted);
 }
 
 /* ===== MODALS ===== */

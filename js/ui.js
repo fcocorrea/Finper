@@ -52,6 +52,11 @@ const UI = (() => {
   }
 
   // ---------- FORMAT ----------
+  // Case- and accent-insensitive key for comparing user text ("Alimentación" ~ "alimentacion").
+  function normalize(str) {
+    return String(str ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  }
+
   function formatCLP(amount) {
     const num = typeof amount === 'number'
       ? Math.round(amount)
@@ -125,15 +130,15 @@ const UI = (() => {
 
     let highlighted = -1;
 
-    inputEl.addEventListener('input', () => {
-      const val = inputEl.value.toLowerCase();
-      const items = getItems().filter(i => i.toLowerCase().includes(val));
-      renderList(items);
-    });
+    const matching = () => {
+      const val = normalize(inputEl.value);
+      return getItems().filter(i => normalize(i).includes(val));
+    };
+
+    inputEl.addEventListener('input', () => renderList(matching()));
 
     inputEl.addEventListener('focus', () => {
-      const val = inputEl.value.toLowerCase();
-      const items = getItems().filter(i => i.toLowerCase().includes(val));
+      const items = matching();
       if (items.length) renderList(items);
     });
 
@@ -163,16 +168,17 @@ const UI = (() => {
     function renderList(items) {
       highlighted = -1;
       if (!items.length) { listEl.classList.remove('show'); return; }
-      listEl.innerHTML = items.map(i =>
+      // ponytail: cap the list — thousands of comments would render thousands of nodes.
+      listEl.innerHTML = items.slice(0, 50).map(i =>
         `<div class="autocomplete-item">${i}</div>`
       ).join('');
       listEl.classList.add('show');
       listEl.querySelectorAll('.autocomplete-item').forEach(el => {
         el.addEventListener('click', () => {
           inputEl.value = el.textContent;
-          listEl.classList.remove('show');
           if (onSelect) onSelect(el.textContent);
           inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+          listEl.classList.remove('show');
         });
       });
     }
@@ -227,7 +233,7 @@ const UI = (() => {
 
   return {
     toast, confirm, openModal, closeModal, closeAllModals,
-    formatCLP, formatDateDMY, formatDateMY, parseDateDMY, parseDateMY,
+    normalize, formatCLP, formatDateDMY, formatDateMY, parseDateDMY, parseDateMY,
     MONTH_NAMES, getMonthLabel,
     setupAutocomplete, renderSelectOptions, enableFormulaInput,
   };
