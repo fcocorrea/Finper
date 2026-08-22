@@ -46,7 +46,7 @@ const Search = (() => {
       Store.getAll(src.type)
         .filter(r => src.fields.some(f => UI.normalize(r[f]).includes(q)))
         .map(record => ({ src, record }))
-    ).sort((a, b) => _dateKey(b) - _dateKey(a));
+    );
   }
 
   function _dateKey({ src, record }) {
@@ -55,9 +55,43 @@ const Search = (() => {
     return p.year * 10000 + p.month * 100 + (p.day || 0);
   }
 
+  // Gastos/Ahorros llevan un mes de pago separado de la fecha; el resto no.
+  function _mesKey({ src, record }) {
+    const p = Store.parseRecordDate(src.type, record.mesPago || record.fecha);
+    if (!p) return 0;
+    return p.year * 100 + p.month;
+  }
+
+  const COLUMNS = [
+    { key: 'tipo', label: 'Tipo', value: r => r.src.label },
+    { key: 'fecha', label: 'Fecha', value: r => _dateKey(r) },
+    { key: 'mesPago', label: 'Mes Pago', value: r => _mesKey(r) },
+    { key: 'categoria', label: 'Categoría', value: r => r.record[r.src.main] || '' },
+    { key: 'detalle', label: 'Detalle', value: r => r.src.detail.map(f => r.record[f]).filter(Boolean).join(' · ') },
+    { key: 'monto', label: 'Monto', value: r => Store.parseCurrency(r.record[r.src.amount]) },
+  ];
+
+  let _sortKey = 'fecha';
+  let _sortDir = 'desc';
+
+  function _applySort(results) {
+    const col = COLUMNS.find(c => c.key === _sortKey);
+    if (!col) return results;
+    return [...results].sort((a, b) => {
+      const av = col.value(a), bv = col.value(b);
+      const cmp = typeof av === 'number' && typeof bv === 'number'
+        ? av - bv
+        : String(av).localeCompare(String(bv), 'es');
+      return _sortDir === 'asc' ? cmp : -cmp;
+    });
+  }
+
+  let _lastQuery = '';
+
   function render(query) {
+    _lastQuery = query;
     const container = document.getElementById('view-search');
-    const results = match(query);
+    const results = _applySort(match(query));
 
     ['view-dashboard', 'view-table', 'view-pivot']
       .forEach(id => document.getElementById(id).classList.add('hidden'));
@@ -77,17 +111,38 @@ const Search = (() => {
         </div>`;
     } else {
       container.innerHTML = `${header}
-        <div class="table-wrapper fade-in"><table class="data-table"><thead><tr>
-          <th>Tipo</th><th>Fecha</th><th>Categoría</th><th>Detalle</th><th>Monto</th>
+        <div class="table-wrapper fade-in"><table class="data-table" id="search-results-table"><thead><tr>
+        ${COLUMNS.map(col => {
+          const isActive = _sortKey === col.key;
+          const indicator = isActive
+            ? `<span class="sort-indicator active">${_sortDir === 'asc' ? '▲' : '▼'}</span>`
+            : `<span class="sort-indicator">⇅</span>`;
+          return `<th data-col-key="${col.key}"><div class="th-sort">${col.label}${indicator}</div></th>`;
+        }).join('')}
         </tr></thead><tbody>
-        ${results.map(({ src, record }) => `<tr>
+        ${results.map(({ src, record }) => `<tr class="data-row" data-id="${record.id}" data-type="${src.type}">
           <td><span class="badge ${src.badge}">${src.label}</span></td>
           <td>${_esc(record.fecha)}</td>
+          <td>${_esc(record.mesPago)}</td>
           <td>${_esc(record[src.main])}</td>
           <td class="search-detail">${_esc(src.detail.map(f => record[f]).filter(Boolean).join(' · '))}</td>
           <td class="pivot-cell-value">${UI.formatCLP(record[src.amount])}</td>
         </tr>`).join('')}
         </tbody></table></div>`;
+
+      container.querySelectorAll('#search-results-table th[data-col-key] .th-sort').forEach(sortDiv => {
+        sortDiv.addEventListener('click', () => {
+          const key = sortDiv.closest('th').dataset.colKey;
+          _sortKey === key ? (_sortDir = _sortDir === 'asc' ? 'desc' : 'asc') : (_sortKey = key, _sortDir = 'asc');
+          render(_lastQuery);
+        });
+      });
+
+      container.querySelector('#search-results-table').addEventListener('click', (e) => {
+        const row = e.target.closest('tr[data-id]');
+        if (!row) return;
+        TableView.openEditRow(row.dataset.type, row.dataset.id, () => render(_lastQuery));
+      });
     }
 
     document.getElementById('clear-search').addEventListener('click', () => {

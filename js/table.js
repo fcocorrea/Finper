@@ -169,7 +169,7 @@ const TableView = (() => {
     });
   }
 
-  function openEditRow(dataType, id) {
+  function openEditRow(dataType, id, onSaved = App.refresh) {
     const record = Store.getAll(dataType).find(r => r.id === id);
     if (!record) return;
 
@@ -212,7 +212,7 @@ const TableView = (() => {
       Store.update(dataType, id, updates);
       UI.closeModal('modal-edit-row');
       UI.toast('Registro actualizado', 'success');
-      App.refresh();
+      onSaved();
     };
 
     document.getElementById('edit-row-delete').onclick = async () => {
@@ -221,7 +221,7 @@ const TableView = (() => {
         Store.remove(dataType, id);
         UI.closeModal('modal-edit-row');
         UI.toast('Registro eliminado', 'success');
-        App.refresh();
+        onSaved();
       }
     };
 
@@ -370,5 +370,5 @@ const TableView = (() => {
     </div>`;
   }
 
-  return { render, renderPivot };
+  return { render, renderPivot, openEditRow };
 })();
