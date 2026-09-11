@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for AI agents (opencode) working with this repository.
 
 ## Project Overview
 
@@ -113,11 +113,27 @@ Key layout classes: `.btn`, `.modal`, `.modal-overlay.active`, `.toast`, `.form-
 3. Add toggle to toolbar, branches in `App.refresh()`, `Dashboard.render()`, `TableView.render()`, and `Importer`
 
 ## Git Conventions
+
 - Use conventional commits format (feat:, fix:, docs:, refactor:).
 - Keep commit subject lines under 72 characters.
 - Branch naming pattern: feature/initials-description or bugfix/initials-description.
-- Always run tests (`npm test` or `pytest`) before generating a commit.
+- No automated test suite exists — do NOT run `npm test` or `pytest`; verify manually (see Testing).
 
 ## Testing
 
 No automated tests. Verify changes manually in the browser. Inspect stored data via DevTools → Application → Local Storage.
+
+## Available Skills (opencode)
+
+| Task | Skill |
+|------|-------|
+| Building UI components/pages, styling | `frontend-design` |
+| Postgres queries / schema design / Supabase optimizations | `supabase-postgres-best-practices` |
+| Stress-testing a plan, "grill me" | `grill-me` |
+| Compressed communication mode | `caveman` |
+| Compact session for handoff | `handoff` |
+| Creating new agent skills | `write-a-skill` |
+
+## MCP
+
+Supabase MCP is configured in `opencode.jsonc` (remote server). Keep it in sync if the project ref changes.
