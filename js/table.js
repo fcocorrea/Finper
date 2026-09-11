@@ -294,7 +294,7 @@ const TableView = (() => {
       const cat = r.categoria || 'Sin categoría';
       if (!rowData[cat]) rowData[cat] = new Array(months.length).fill(0);
       const idx = months.findIndex(({month, year}) => {
-        const p = Store.parseRecordDate('expenses', r.mesPago || r.fecha);
+        const p = Store.parseRecordDate('expenses', Store.getRecordDateStr('expenses', r));
         return p && p.month === month && p.year === year;
       });
       if (idx >= 0) rowData[cat][idx] += Store.parseCurrency(r.gasto);
@@ -327,7 +327,7 @@ const TableView = (() => {
       const cat = r.categoria || 'Sin categoría';
       if (!rowData[cat]) rowData[cat] = new Array(months.length).fill(0);
       const idx = months.findIndex(({month, year}) => {
-        const p = Store.parseRecordDate('savings', r.mesPago || r.fecha);
+        const p = Store.parseRecordDate('savings', Store.getRecordDateStr('savings', r));
         return p && p.month === month && p.year === year;
       });
       if (idx >= 0) rowData[cat][idx] += Store.parseCurrency(r.monto);

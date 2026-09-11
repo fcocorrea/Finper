@@ -328,18 +328,19 @@ const Store = (() => {
     return months.flatMap(({ month, year }) => getByMonth(type, month, year));
   }
 
+  // Single source of truth for which date field a record is bucketed by.
+  // ponytail: _dateMode='fecha' filters by exact date instead of billing month
+  function getRecordDateStr(type, record) {
+    if (type === 'expenses' || type === 'savings') {
+      return _dateMode === 'fecha' ? record.fecha : (record.mesPago || record.fecha);
+    }
+    return record.fecha;
+  }
+
   function getByMonth(type, month, year) {
     const all = getAll(type);
     return all.filter(record => {
-      let dateStr;
-      if (type === 'expenses' || type === 'savings') {
-        // ponytail: _dateMode='fecha' filters by exact date instead of billing month
-        dateStr = _dateMode === 'fecha' ? record.fecha : (record.mesPago || record.fecha);
-      } else {
-        dateStr = record.fecha;
-      }
-      if (!dateStr) return false;
-      const parsed = parseRecordDate(type, dateStr);
+      const parsed = parseRecordDate(type, getRecordDateStr(type, record));
       if (!parsed) return false;
       return parsed.month === month && parsed.year === year;
     });
@@ -410,7 +411,7 @@ const Store = (() => {
     getColumns, setColumns,
     getIncomeSources, addIncomeSource,
     getSuggestions, predictCategory,
-    setDateMode, getByMonths, getByMonth, parseRecordDate,
+    setDateMode, getByMonths, getByMonth, getRecordDateStr, parseRecordDate,
     getTotalIncome, getTotalExpenses, getTotalSavings, parseCurrency,
     getMonthlyBudget, setMonthlyBudget,
     DEFAULT_COLUMNS,
