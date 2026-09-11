@@ -104,6 +104,7 @@ const Store = (() => {
     if (_sc && !_sc.includes('Trading')) _set(KEYS.savingsCategories, [..._sc, 'Trading']);
 
     _migrateExpensesToSavings();
+    _migrateCanonicalPaymentMethods();
 
     if (typeof Sync !== 'undefined') {
       Sync.init();
@@ -148,6 +149,46 @@ const Store = (() => {
     }
 
     localStorage.setItem(MIGRATION_KEY, '1');
+  }
+
+  // Un respaldo exportado de Supabase o un CSV antiguo pueden traer variantes del
+  // mismo medio de pago ("Tarjeta de Crédito (cuotas)", mayúsculas, etc.).
+  // Se reescriben al canonical de la app; un valor desconocido se respeta tal cual.
+  const PAGO_CANONICAL = {
+    'tarjeta de credito': 'Tarjeta de crédito',
+    'tarjeta de credito en cuotas': 'Tarjeta de crédito en cuotas',
+    'cuenta corriente': 'Cuenta corriente',
+  };
+
+  function _canonicalPago(val) {
+    if (!val || typeof val !== 'string') return val;
+    const norm = val
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\(\s*cuotas\s*\)/i, ' en cuotas')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return PAGO_CANONICAL[norm] || val;
+  }
+
+  function _migrateCanonicalPaymentMethods() {
+    const methods = _get(KEYS.paymentMethods) || [];
+    const deduped = [];
+    methods.forEach(m => {
+      const c = _canonicalPago(m);
+      if (c && !deduped.includes(c)) deduped.push(c);
+    });
+    if (JSON.stringify(deduped) !== JSON.stringify(methods)) _set(KEYS.paymentMethods, deduped);
+
+    const expenses = getAll('expenses');
+    let changed = false;
+    const fixed = expenses.map(e => {
+      const c = _canonicalPago(e.medioPago);
+      if (c !== e.medioPago) { changed = true; return { ...e, medioPago: c }; }
+      return e;
+    });
+    if (changed) _set(KEYS.expenses, fixed);
   }
 
   // ---------- GENERIC CRUD ----------
