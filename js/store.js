@@ -250,7 +250,8 @@ const Store = (() => {
   }
 
   // ---------- CATEGORIES ----------
-  function getCategories() { return _get(KEYS.categories) || []; }
+  function getCategories() { return sortCategories(_get(KEYS.categories) || []); }
+  function sortCategories(cats) { return [...cats].sort((a, b) => a.localeCompare(b, 'es')); }
   function addCategory(name) {
     const cats = getCategories();
     if (cats.includes(name)) return false;
@@ -339,7 +340,7 @@ const Store = (() => {
 
   // ---------- FILTERS ----------
   // ---------- SAVINGS CATEGORIES ----------
-  function getSavingsCategories() { return _get(KEYS.savingsCategories) || []; }
+  function getSavingsCategories() { return sortCategories(_get(KEYS.savingsCategories) || []); }
   function addSavingsCategory(name) {
     const cats = getSavingsCategories();
     if (cats.includes(name)) return false;
