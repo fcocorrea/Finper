@@ -47,6 +47,18 @@ const Sync = (() => {
     return `${_fullYear(y)}-${m.padStart(2, '0')}-01`;
   }
 
+  function _isoToMY(s) {
+    // '2026-05-01T...' → '05-26'
+    const [y, m] = s.split('T')[0].split('-');
+    return `${m}-${y.slice(2)}`;
+  }
+
+  // First day of the current month, ISO — fallback when a payment month is missing.
+  function _currentMonthISO() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-01`;
+  }
+
   // ── medio_pago case normalization ─────────────────────────────
   // App stores lowercase 'c'; DB CHECK constraint uses uppercase 'C'.
 
@@ -104,6 +116,7 @@ const Sync = (() => {
     return {
       _supabase_id: row.id,
       fecha:        _isoToDMY(row.fecha),
+      fechaPago:    row.fecha_pago ? _isoToMY(row.fecha_pago) : '',
       persona:      row.persona      || '',
       descripcion:  row.descripcion  || '',
       tipo:         row.tipo         || '',
@@ -167,6 +180,7 @@ const Sync = (() => {
       descripcion: r.descripcion || null,
       tipo:        r.tipo,
       monto:       Store.parseCurrency(r.monto),
+      fecha_pago:  r.fechaPago ? _myToISO(r.fechaPago) : _currentMonthISO(),
     };
   }
 

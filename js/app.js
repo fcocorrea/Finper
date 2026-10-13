@@ -420,9 +420,15 @@ const App = (() => {
     } else if (type === 'accounts') {
       title.textContent = 'Registrar Cuenta';
       content.innerHTML = `
-        <div class="form-group">
-          <label class="form-label">Fecha (dd-mm-yy)</label>
-          <input class="form-input" id="add-fecha" placeholder="09-05-26" value="${UI.formatDateDMY(new Date())}" />
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">Fecha (dd-mm-yy)</label>
+            <input class="form-input" id="add-fecha" placeholder="09-05-26" value="${UI.formatDateDMY(new Date())}" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Fecha pago (mm-yy)</label>
+            <input class="form-input" id="add-fechaPago" placeholder="05-26" value="${UI.formatDateMY(new Date())}" />
+          </div>
         </div>
         <div class="form-group autocomplete-wrapper">
           <label class="form-label">Persona</label>
@@ -459,12 +465,13 @@ const App = (() => {
 
       const saveAccount = () => {
         const fecha = document.getElementById('add-fecha').value.trim();
+        const fechaPago = document.getElementById('add-fechaPago').value.trim() || UI.formatDateMY(new Date());
         const persona = document.getElementById('add-persona').value.trim();
         const descripcion = document.getElementById('add-descripcion').value.trim();
         const tipo = document.getElementById('add-tipo').value;
         const monto = parseInt(document.getElementById('add-monto').value) || 0;
         if (!fecha || !persona || !monto) { UI.toast('Completa los campos obligatorios', 'warning'); return false; }
-        Store.add('accounts', { fecha, persona, descripcion, tipo, monto });
+        Store.add('accounts', { fecha, fechaPago, persona, descripcion, tipo, monto });
         refresh();
         return true;
       };

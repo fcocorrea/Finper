@@ -55,6 +55,7 @@ const Store = (() => {
     ],
     accounts: [
       { key: 'fecha', label: 'Fecha', type: 'date-dmy' },
+      { key: 'fechaPago', label: 'Fecha pago', type: 'date-my' },
       { key: 'persona', label: 'Persona', type: 'text' },
       { key: 'descripcion', label: 'Descripción', type: 'text' },
       { key: 'tipo', label: 'Tipo', type: 'select' },
@@ -105,6 +106,7 @@ const Store = (() => {
 
     _migrateExpensesToSavings();
     _migrateCanonicalPaymentMethods();
+    _migrateAccountColumns();
 
     if (typeof Sync !== 'undefined') {
       Sync.init();
@@ -170,6 +172,18 @@ const Store = (() => {
       .replace(/\s+/g, ' ')
       .trim();
     return PAGO_CANONICAL[norm] || val;
+  }
+
+  // Existing devices keep their column definitions in localStorage, so a new
+  // default column won't show up unless it is merged into the stored set once.
+  function _migrateAccountColumns() {
+    const all = _get(KEYS.columns);
+    if (!all || !Array.isArray(all.accounts)) return;
+    if (all.accounts.some(c => c.key === 'fechaPago')) return;
+    const idx = all.accounts.findIndex(c => c.key === 'fecha');
+    all.accounts.splice(idx === -1 ? 1 : idx + 1, 0,
+      { key: 'fechaPago', label: 'Fecha pago', type: 'date-my' });
+    _set(KEYS.columns, all);
   }
 
   function _migrateCanonicalPaymentMethods() {
@@ -375,6 +389,9 @@ const Store = (() => {
   function getRecordDateStr(type, record) {
     if (type === 'expenses' || type === 'savings') {
       return _dateMode === 'fecha' ? record.fecha : (record.mesPago || record.fecha);
+    }
+    if (type === 'accounts') {
+      return _dateMode === 'fecha' ? record.fecha : (record.fechaPago || record.fecha);
     }
     return record.fecha;
   }

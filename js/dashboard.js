@@ -2,6 +2,7 @@
 
 const Dashboard = (() => {
   let barChart = null;
+  let accountsChart = null;
 
   function render(dataType, months) {
     const container = document.getElementById('view-dashboard');
@@ -12,7 +13,7 @@ const Dashboard = (() => {
     } else if (dataType === 'incomes') {
       renderIncomesDashboard(container, months);
     } else if (dataType === 'accounts') {
-      renderAccountsDashboard(container);
+      renderAccountsDashboard(container, months);
     } else if (dataType === 'savings') {
       renderSavingsDashboard(container, months);
     } else {
@@ -514,12 +515,42 @@ const Dashboard = (() => {
   }
 
   // ---------- ACCOUNTS ----------
-  function renderAccountsDashboard(container) {
-    const accounts   = Store.getAll('accounts');
+  // Filtra por el mes activo según el modo de fecha: "Mes Pago" usa fechaPago,
+  // "Mes gasto" usa fecha. El gráfico agrupa por persona para mostrar a quién
+  // se le debe pagar y a quién se le debe cobrar, no solo el total por tipo.
+  function renderAccountsDashboard(container, months) {
+    const accounts = Store.getByMonths('accounts', months);
+
+    if (!accounts.length) {
+      container.innerHTML = `
+        <div class="empty-state fade-in">
+          <div class="empty-state-text">Sin cuentas para este período</div>
+          <div class="empty-state-hint">Cambia el mes o el modo de fecha para ver otros registros</div>
+        </div>`;
+      return;
+    }
+
     const cobrar     = accounts.filter(a => a.tipo === 'Cuentas por cobrar');
     const pagar      = accounts.filter(a => a.tipo === 'Cuentas por pagar');
     const totalCobrar = cobrar.reduce((s, a) => s + Store.parseCurrency(a.monto), 0);
     const totalPagar  = pagar.reduce((s, a)  => s + Store.parseCurrency(a.monto), 0);
+
+    const personMap = {};
+    accounts.forEach(a => {
+      if (a.tipo !== 'Cuentas por cobrar' && a.tipo !== 'Cuentas por pagar') return;
+      const name = a.persona || 'Desconocido';
+      if (!personMap[name]) personMap[name] = { cobrar: 0, pagar: 0 };
+      const amount = Store.parseCurrency(a.monto);
+      if (a.tipo === 'Cuentas por cobrar') personMap[name].cobrar += amount;
+      else personMap[name].pagar += amount;
+    });
+
+    const persons = Object.entries(personMap)
+      .sort(([, a], [, b]) => (b.cobrar + b.pagar) - (a.cobrar + a.pagar));
+
+    const periodLabel = months.length > 1
+      ? `${UI.getMonthLabel(months[0].month, months[0].year)} – ${UI.getMonthLabel(months[months.length - 1].month, months[months.length - 1].year)}`
+      : UI.getMonthLabel(months[0].month, months[0].year);
 
     container.innerHTML = `
       <div class="metrics-grid fade-in">
@@ -536,22 +567,44 @@ const Dashboard = (() => {
         <div class="metric-card success">
           <div class="metric-label">Balance Neto</div>
           <div class="metric-value ${totalCobrar - totalPagar >= 0 ? 'positive' : 'negative'}">${UI.formatCLP(totalCobrar - totalPagar)}</div>
+          <div class="metric-detail">${periodLabel}</div>
         </div>
       </div>
       <div class="charts-grid fade-in">
         <div class="chart-container">
-          <div class="card-header"><h3 class="card-title">Distribución de Cuentas</h3></div>
-          <canvas id="chart-accounts-pie"></canvas>
+          <div class="card-header"><h3 class="card-title">Cuentas por Persona</h3></div>
+          <canvas id="chart-accounts-person"></canvas>
         </div>
       </div>`;
 
-    new Chart(document.getElementById('chart-accounts-pie').getContext('2d'), {
-      type: 'doughnut',
+    if (accountsChart) accountsChart.destroy();
+    accountsChart = new Chart(document.getElementById('chart-accounts-person').getContext('2d'), {
+      type: 'bar',
       data: {
-        labels: ['Por Cobrar', 'Por Pagar'],
-        datasets: [{ data: [totalCobrar, totalPagar], backgroundColor: ['#10b981', '#4a7cf7'], borderWidth: 0 }]
+        labels: persons.map(([name]) => name),
+        datasets: [
+          {
+            label: 'Por cobrar', data: persons.map(([, v]) => v.cobrar),
+            backgroundColor: '#10b981', borderRadius: 4, maxBarThickness: 26,
+          },
+          {
+            label: 'Por pagar', data: persons.map(([, v]) => v.pagar),
+            backgroundColor: '#4a7cf7', borderRadius: 4, maxBarThickness: 26,
+          },
+        ],
       },
-      options: { responsive: true, plugins: { legend: { labels: { color: '#1e293b' } } } }
+      options: {
+        responsive: true,
+        indexAxis: 'y',
+        plugins: {
+          legend: { position: 'bottom', labels: { color: '#1e293b', usePointStyle: true, padding: 10 } },
+          tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${UI.formatCLP(ctx.raw)}` } },
+        },
+        scales: {
+          x: { ticks: { color: '#64748b', callback: v => UI.formatCLP(v) }, grid: { color: 'rgba(0,0,0,0.06)' } },
+          y: { ticks: { color: '#1e293b', font: { size: 13, weight: 'bold' } }, grid: { display: false } },
+        },
+      },
     });
   }
 
