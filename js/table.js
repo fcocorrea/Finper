@@ -241,7 +241,7 @@ const TableView = (() => {
     if (dataType === 'expenses') renderExpensePivot(container, months);
     else if (dataType === 'incomes') renderIncomePivot(container, months);
     else if (dataType === 'savings') renderSavingsPivot(container, months);
-    else renderAccountPivot(container);
+    else renderAccountPivot(container, months);
   }
 
   function _bindPivotDrill(container) {
@@ -335,8 +335,10 @@ const TableView = (() => {
     _renderPivotTable(container, 'Categoría', 'categoria', rowData, monthLabels, months.length > 1);
   }
 
-  function renderAccountPivot(container) {
-    const accounts = Store.getAll('accounts');
+  // Filtra por el mismo período activo que el dashboard (respeta el modo de fecha:
+  // "Mes Pago" usa fechaPago, "Fecha" usa fecha), para que ambos totales coincidan.
+  function renderAccountPivot(container, months) {
+    const accounts = Store.getByMonths('accounts', months);
     if (!accounts.length) { container.innerHTML = emptyPivot(); return; }
 
     const pivot = {};
