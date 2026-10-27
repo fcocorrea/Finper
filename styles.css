@@ -622,6 +622,11 @@ body {
   text-align: right;
 }
 
+.pivot-pct {
+  color: var(--color-muted);
+  font-variant-numeric: tabular-nums;
+}
+
 .pivot-total {
   font-weight: 800;
   background: rgba(74, 124, 247, 0.08) !important;

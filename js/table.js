@@ -251,6 +251,10 @@ const TableView = (() => {
     });
   }
 
+  function _pct(amount, total) {
+    return total > 0 ? `${(amount / total * 100).toFixed(1)}%` : '0%';
+  }
+
   function _renderPivotTable(container, rowLabel, drillKey, rowData, monthLabels, isRange) {
     const rows = Object.entries(rowData)
       .filter(([, amounts]) => amounts.some(a => a > 0))
@@ -266,6 +270,7 @@ const TableView = (() => {
       <th>${rowLabel}</th>
       ${monthLabels.map(l => `<th>${l}</th>`).join('')}
       ${isRange ? '<th>Total</th>' : ''}
+      <th>% del Total</th>
     </tr></thead><tbody>`;
 
     rows.forEach(([name, amounts]) => {
@@ -274,6 +279,7 @@ const TableView = (() => {
         <td class="pivot-drillable" data-drill-key="${drillKey}" data-drill-value="${name}"><strong>${name}</strong></td>
         ${amounts.map(a => `<td class="pivot-cell-value">${UI.formatCLP(a)}</td>`).join('')}
         ${isRange ? `<td class="pivot-cell-value"><strong>${UI.formatCLP(rowTotal)}</strong></td>` : ''}
+        <td class="pivot-cell-value pivot-pct">${_pct(rowTotal, grandTotal)}</td>
       </tr>`;
     });
 
@@ -281,6 +287,7 @@ const TableView = (() => {
       <td><strong>Total</strong></td>
       ${monthTotals.map(t => `<td class="pivot-cell-value">${UI.formatCLP(t)}</td>`).join('')}
       ${isRange ? `<td class="pivot-cell-value"><strong>${UI.formatCLP(grandTotal)}</strong></td>` : ''}
+      <td class="pivot-cell-value pivot-pct">100%</td>
     </tr></tbody></table></div>`;
     container.innerHTML = html;
     _bindPivotDrill(container);
@@ -349,8 +356,10 @@ const TableView = (() => {
       pivot[key] = (pivot[key] || 0) + Store.parseCurrency(a.monto);
     });
 
+    const grandTotal = Object.values(pivot).reduce((a, b) => a + b, 0);
+
     let html = `<div class="table-wrapper fade-in"><table class="data-table pivot-table">
-      <thead><tr><th>Persona</th><th>Tipo</th><th>Total</th></tr></thead><tbody>`;
+      <thead><tr><th>Persona</th><th>Tipo</th><th>Total</th><th>% del Total</th></tr></thead><tbody>`;
 
     Object.entries(pivot).sort((a, b) => b[1] - a[1]).forEach(([key, total]) => {
       const [persona, tipo] = key.split('|||');
@@ -358,6 +367,7 @@ const TableView = (() => {
         <td class="pivot-drillable" data-drill-key="persona" data-drill-value="${persona}"><strong>${persona}</strong></td>
         <td><span class="badge ${tipo === 'Cuentas por cobrar' ? 'badge-success' : 'badge-primary'}">${tipo}</span></td>
         <td class="pivot-cell-value">${UI.formatCLP(total)}</td>
+        <td class="pivot-cell-value pivot-pct">${_pct(total, grandTotal)}</td>
       </tr>`;
     });
     html += `</tbody></table></div>`;
