@@ -34,11 +34,17 @@ const TableView = (() => {
       columns.every(col => {
         const term = (_filters[col.key] || '').trim().toLowerCase();
         if (!term) return true;
-        let display = row[col.key] || '';
-        if (col.type === 'currency') display = UI.formatCLP(display);
-        return String(display).toLowerCase().includes(term);
+        return String(_displayValue(row, col)).toLowerCase().includes(term);
       })
     );
+  }
+
+  // Value as shown in the table; derived columns (p. ej. "Cuota") no tienen
+  // campo propio en el registro.
+  function _displayValue(row, col) {
+    if (col.type === 'cuota') return Store.formatCuota(row);
+    if (col.type === 'currency') return UI.formatCLP(row[col.key]);
+    return row[col.key] || '';
   }
 
   function _applySort(data, columns) {
@@ -51,6 +57,8 @@ const TableView = (() => {
       let cmp;
       if (col.type === 'currency') {
         cmp = Store.parseCurrency(aVal) - Store.parseCurrency(bVal);
+      } else if (col.type === 'cuota') {
+        cmp = (parseInt(a.cuotaActual) || 0) - (parseInt(b.cuotaActual) || 0);
       } else if (col.type === 'date-dmy') {
         cmp = _parseDateDMY(aVal) - _parseDateDMY(bVal);
       } else if (col.type === 'date-my') {
@@ -123,9 +131,7 @@ const TableView = (() => {
       sorted.forEach(row => {
         html += `<tr class="data-row" data-id="${row.id}">`;
         columns.forEach(col => {
-          let val = row[col.key] || '';
-          if (col.type === 'currency') val = UI.formatCLP(val);
-          html += `<td>${val}</td>`;
+          html += `<td>${_displayValue(row, col)}</td>`;
         });
         html += `</tr>`;
       });
@@ -178,6 +184,16 @@ const TableView = (() => {
 
     columns.forEach(col => {
       const val = record[col.key] || '';
+      if (col.type === 'cuota') {
+        // La cuota es producto del plan creado al registrar la cuenta, no un
+        // campo editable: cambiarla obligaría a regenerar todos los registros.
+        formHTML += `<div class="form-group">
+          <label class="form-label">${col.label}</label>
+          <input class="form-input" value="${Store.formatCuota(record)}" disabled />
+          <span class="form-hint">Las cuotas se definen al crear la cuenta</span>
+        </div>`;
+        return;
+      }
       if (col.type === 'select') {
         let options = [];
         if (col.key === 'categoria' && dataType === 'savings') options = Store.getSavingsCategories();

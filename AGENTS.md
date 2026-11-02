@@ -60,7 +60,9 @@ After any data mutation, call `App.refresh()` to re-render.
 
 **Income record**: `{ fecha (mm-yy), monto, fuente, id, _created, _updated }`
 
-**Account record**: `{ fecha (dd-mm-yy), persona, descripcion, tipo, monto, id, _created, _updated }`
+**Account record**: `{ fecha (dd-mm-yy), fechaPago (mm-yy), persona, descripcion, tipo, monto, cuotaActual, totalCuotas, id, _created, _updated }`
+
+Cuando una cuenta se paga en cuotas, `Store.addInstallmentAccounts()` crea **un registro por mes** (monto dividido, `fechaPago` avanzando un mes, `cuotaActual`/`totalCuotas`). No existe un registro maestro: cada cuota se edita o elimina de forma independiente.
 
 Currency values are stored as integers (e.g., `50000` = $50,000 CLP). Parse with `Store.parseCurrency()`, format with `UI.formatCLP()`.
 
@@ -92,7 +94,7 @@ Key layout classes: `.btn`, `.modal`, `.modal-overlay.active`, `.toast`, `.form-
 - **DOM**: no framework — direct `innerHTML`, `querySelector`, `addEventListener`
 - **Modals**: toggled with `.active` class on `.modal-overlay`
 - **Views**: shown/hidden with `.hidden` class
-- **Column types** in `DEFAULT_COLUMNS` (`store.js`) determine input rendering in `table.js`: `date-dmy`, `date-my`, `currency`, `text`, `select`
+- **Column types** in `DEFAULT_COLUMNS` (`store.js`) determine input rendering in `table.js`: `date-dmy`, `date-my`, `currency`, `text`, `select`. El tipo `cuota` es **derivado** (se compone con `Store.formatCuota()` y no tiene campo propio): se excluye de importación y se escribe como texto en la exportación
 - **Chart instances** in `dashboard.js` (`lineChart`, `barChart`) must be destroyed before re-creating on re-render
 - Confirm dialogs are async Promise-based (`UI.confirm()`)
 

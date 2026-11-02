@@ -448,6 +448,17 @@ const App = (() => {
             <input class="form-input" id="add-monto" type="text" placeholder="0 o =1500+2300" />
           </div>
         </div>
+        <div class="checkbox-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="add-en-cuotas" />
+            <span>Se paga en cuotas</span>
+          </label>
+        </div>
+        <div class="form-group hidden" id="cuotas-group">
+          <label class="form-label">Número de cuotas</label>
+          <input class="form-input" id="add-cuotas" type="number" min="2" max="120" step="1" placeholder="3" />
+          <span class="form-hint" id="cuotas-preview"></span>
+        </div>
         <div class="modal-footer">
           <button class="btn btn-outline" id="add-back">← Volver</button>
           <button class="btn btn-outline btn-icon" id="add-save-continue" title="Guardar y agregar otro">+</button>
@@ -463,6 +474,36 @@ const App = (() => {
         null
       );
 
+      const cuotasToggle = document.getElementById('add-en-cuotas');
+      const cuotasGroup  = document.getElementById('cuotas-group');
+      const cuotasInput  = document.getElementById('add-cuotas');
+      const montoInput   = document.getElementById('add-monto');
+
+      // Aviso en vivo de cuánto cae en cada mes, incluyendo el residuo del redondeo.
+      const updateCuotasPreview = () => {
+        const preview = document.getElementById('cuotas-preview');
+        if (montoInput.value.trim().startsWith('=')) { preview.textContent = ''; return; }
+        const total = Store.parseCurrency(montoInput.value);
+        const n = parseInt(cuotasInput.value) || 0;
+        if (!total || n < 2) { preview.textContent = ''; return; }
+        const shares = Store.splitInstallments(total, n);
+        const first = shares[0];
+        const last = shares[shares.length - 1];
+        preview.textContent = first === last
+          ? `${n} cuotas de ${UI.formatCLP(first)}`
+          : `${n} cuotas: ${UI.formatCLP(first)} la primera y ${UI.formatCLP(last)} la última`;
+      };
+
+      cuotasToggle.addEventListener('change', () => {
+        cuotasGroup.classList.toggle('hidden', !cuotasToggle.checked);
+        if (cuotasToggle.checked) cuotasInput.focus();
+        updateCuotasPreview();
+      });
+      ['input', 'blur'].forEach(ev => {
+        cuotasInput.addEventListener(ev, updateCuotasPreview);
+        montoInput.addEventListener(ev, updateCuotasPreview);
+      });
+
       const saveAccount = () => {
         const fecha = document.getElementById('add-fecha').value.trim();
         const fechaPago = document.getElementById('add-fechaPago').value.trim() || UI.formatDateMY(new Date());
@@ -470,8 +511,25 @@ const App = (() => {
         const descripcion = document.getElementById('add-descripcion').value.trim();
         const tipo = document.getElementById('add-tipo').value;
         const monto = parseInt(document.getElementById('add-monto').value) || 0;
+        const enCuotas = cuotasToggle.checked;
+        const cuotas = parseInt(cuotasInput.value) || 0;
+
         if (!fecha || !persona || !monto) { UI.toast('Completa los campos obligatorios', 'warning'); return false; }
-        Store.add('accounts', { fecha, fechaPago, persona, descripcion, tipo, monto });
+        if (enCuotas && (cuotas < 2 || cuotas > 120)) {
+          UI.toast('Indica un número de cuotas entre 2 y 120', 'warning');
+          return false;
+        }
+
+        const record = { fecha, fechaPago, persona, descripcion, tipo, monto };
+        if (enCuotas) {
+          // bulkAdd ya escribió en localStorage; el push a Supabase corre en
+          // segundo plano para no bloquear el refresco ni el cierre del modal.
+          Store.addInstallmentAccounts(record, cuotas)
+            .catch(err => console.error('[Cuentas] sincronización fallida:', err));
+          UI.toast(`Cuenta registrada en ${cuotas} cuotas`, 'success');
+        } else {
+          Store.add('accounts', record);
+        }
         refresh();
         return true;
       };

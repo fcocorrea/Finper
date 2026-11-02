@@ -38,6 +38,10 @@ const Store = (() => {
   const DEFAULT_PAYMENT_METHODS = ['Tarjeta de crédito', 'Cuenta corriente', 'Tarjeta de crédito en cuotas'];
   const DEFAULT_ACCOUNT_TYPES = ['Cuentas por cobrar', 'Cuentas por pagar'];
 
+  // Columna derivada: se compone de cuotaActual/totalCuotas, no es un campo
+  // propio del registro y por eso queda fuera de importaciones y exportaciones.
+  const ACCOUNT_CUOTA_COLUMN = { key: 'cuota', label: 'Cuota', type: 'cuota' };
+
   const DEFAULT_COLUMNS = {
     expenses: [
       { key: 'fecha', label: 'Fecha', type: 'date-dmy' },
@@ -60,6 +64,7 @@ const Store = (() => {
       { key: 'descripcion', label: 'Descripción', type: 'text' },
       { key: 'tipo', label: 'Tipo', type: 'select' },
       { key: 'monto', label: 'Monto', type: 'currency' },
+      ACCOUNT_CUOTA_COLUMN,
     ],
     savings: [
       { key: 'fecha', label: 'Fecha', type: 'date-dmy' },
@@ -179,11 +184,21 @@ const Store = (() => {
   function _migrateAccountColumns() {
     const all = _get(KEYS.columns);
     if (!all || !Array.isArray(all.accounts)) return;
-    if (all.accounts.some(c => c.key === 'fechaPago')) return;
-    const idx = all.accounts.findIndex(c => c.key === 'fecha');
-    all.accounts.splice(idx === -1 ? 1 : idx + 1, 0,
-      { key: 'fechaPago', label: 'Fecha pago', type: 'date-my' });
-    _set(KEYS.columns, all);
+    let changed = false;
+
+    if (!all.accounts.some(c => c.key === 'fechaPago')) {
+      const idx = all.accounts.findIndex(c => c.key === 'fecha');
+      all.accounts.splice(idx === -1 ? 1 : idx + 1, 0,
+        { key: 'fechaPago', label: 'Fecha pago', type: 'date-my' });
+      changed = true;
+    }
+
+    if (!all.accounts.some(c => c.key === ACCOUNT_CUOTA_COLUMN.key)) {
+      all.accounts.push({ ...ACCOUNT_CUOTA_COLUMN });
+      changed = true;
+    }
+
+    if (changed) _set(KEYS.columns, all);
   }
 
   function _migrateCanonicalPaymentMethods() {
@@ -311,6 +326,50 @@ const Store = (() => {
 
   // ---------- ACCOUNT TYPES ----------
   function getAccountTypes() { return _get(KEYS.accountTypes) || []; }
+
+  // ---------- INSTALLMENTS (cuotas) ----------
+  // Divide un monto en cuotas enteras que suman exactamente el total: el
+  // residuo del redondeo se reparte en las primeras cuotas.
+  function splitInstallments(monto, cuotas) {
+    const total = parseCurrency(monto);
+    const n = Math.floor(Number(cuotas) || 0);
+    if (n <= 1) return [total];
+    const base = Math.floor(total / n);
+    const resto = total - base * n;
+    return Array.from({ length: n }, (_, i) => base + (i < resto ? 1 : 0));
+  }
+
+  // Texto de la columna "Cuota" ("2/3"); vacío si la cuenta no va en cuotas.
+  function formatCuota(record) {
+    if (!record || !record.totalCuotas || record.totalCuotas < 2) return '';
+    return `${record.cuotaActual || 1}/${record.totalCuotas}`;
+  }
+
+  // Una cuenta en cuotas es N registros mensuales consecutivos: misma fecha,
+  // persona, descripción y tipo, con el monto dividido y fechaPago avanzando
+  // un mes por cuota.
+  function addInstallmentAccounts(record, cuotas) {
+    const shares = splitInstallments(record.monto, cuotas);
+    const [mm, yy] = String(record.fechaPago || '').split('-');
+    const today = new Date();
+    let month = parseInt(mm) || today.getMonth() + 1;
+    let year = yy && !isNaN(parseInt(yy)) ? _fullYear(yy) : today.getFullYear();
+    // Un fechaPago escrito a mano ("13-26") no debe generar meses inexistentes.
+    if (month < 1 || month > 12) { month = today.getMonth() + 1; year = today.getFullYear(); }
+
+    const records = shares.map((monto, i) => {
+      if (i > 0 && ++month > 12) { month = 1; year++; }
+      return {
+        ...record,
+        monto,
+        fechaPago: `${String(month).padStart(2, '0')}-${String(year).slice(-2)}`,
+        cuotaActual: i + 1,
+        totalCuotas: shares.length,
+      };
+    });
+
+    return bulkAdd('accounts', records);
+  }
 
   // ---------- COLUMNS ----------
   function getColumns(type) {
@@ -467,6 +526,7 @@ const Store = (() => {
     getCategories, addCategory, removeCategory, renameCategory,
     getSavingsCategories, addSavingsCategory, removeSavingsCategory, renameSavingsCategory,
     getExpenseTypes, getPaymentMethods, getAccountTypes,
+    splitInstallments, formatCuota, addInstallmentAccounts,
     getColumns, setColumns,
     getIncomeSources, addIncomeSource,
     getSuggestions, predictCategory,

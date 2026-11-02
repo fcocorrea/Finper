@@ -87,11 +87,17 @@ const Archivo = (() => {
     UI.closeModal(modalId);
   }
 
+  // Las columnas derivadas (p. ej. "Cuota") no tienen campo propio en el registro.
+  function _cellValue(record, col) {
+    if (col.type === 'cuota') return Store.formatCuota(record);
+    return record[col.key] ?? '';
+  }
+
   function _buildWorkbook(type) {
     const columns = Store.getColumns(type);
     const records = Store.getAll(type);
     const headers = columns.map(c => c.label);
-    const rows = records.map(r => columns.map(c => r[c.key] ?? ''));
+    const rows = records.map(r => columns.map(c => _cellValue(r, c)));
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Datos');

@@ -121,6 +121,8 @@ const Sync = (() => {
       descripcion:  row.descripcion  || '',
       tipo:         row.tipo         || '',
       monto:        row.monto,
+      cuotaActual:  row.cuota_actual || null,
+      totalCuotas:  row.total_cuotas || null,
       _created:     row.created_at,
       _updated:     row.updated_at,
     };
@@ -181,6 +183,8 @@ const Sync = (() => {
       tipo:        r.tipo,
       monto:       Store.parseCurrency(r.monto),
       fecha_pago:  r.fechaPago ? _myToISO(r.fechaPago) : _currentMonthISO(),
+      cuota_actual: r.cuotaActual || null,
+      total_cuotas: r.totalCuotas || null,
     };
   }
 

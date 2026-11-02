@@ -28,7 +28,7 @@ Finper/
 - **Dashboard**: métricas financieras, gráfico de ingresos vs gastos, gráfico dinámico por categoría/tipo/medio de pago
 - **Tabla**: vista tabular con edición y eliminación inline
 - **Tabla Dinámica**: agrupación por mes×categoría (gastos), mes×fuente (ingresos), persona×tipo (cuentas)
-- **Cuotas**: al registrar gastos en cuotas, se generan automáticamente los registros futuros
+- **Cuotas**: al registrar gastos en cuotas, se generan automáticamente los registros futuros. Las cuentas por cobrar/pagar también admiten pago en cuotas: se registra una cuenta por mes con el monto dividido
 - **Autocompletado**: sugerencias basadas en datos previos + predicción de categoría
 - **Importación**: soporte para .csv y .xlsx con validación de encabezados
 - **Edición**: gestión de columnas y categorías de gastos

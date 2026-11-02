@@ -102,7 +102,9 @@ const Importer = (() => {
 
       // ── 3. Match headers ───────────────────────────────────────────
       const dataType = document.getElementById('import-type').value;
-      const columns = Store.getColumns(dataType);
+      // Las columnas derivadas (p. ej. "Cuota") no vienen en los archivos: se
+      // recalculan a partir de cuotaActual/totalCuotas.
+      const columns = Store.getColumns(dataType).filter(c => c.type !== 'cuota');
       const fileHeaders = Object.keys(jsonData[0]);
       const colLabels = columns.map(c => c.label.toLowerCase().trim());
 
