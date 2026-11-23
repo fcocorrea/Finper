@@ -22,6 +22,78 @@ const Archivo = (() => {
     UI.openModal('modal-delete');
   }
 
+  // ---------- FECHA DE FACTURACIÓN ----------
+  // La factura de la tarjeta se paga con el sueldo de fin de mes, que se usa
+  // para el mes siguiente: el mes de pago siempre es facturación + 1.
+  function openBilling() {
+    const content = document.getElementById('billing-content');
+    const billing = Store.getBillingDate();
+
+    content.innerHTML = `
+      <p class="form-label" style="margin-bottom:var(--space-4)">
+        Ingresa la próxima fecha en que tu tarjeta de crédito factura. Los gastos con
+        tarjeta calcularán su mes de pago desde esa fecha.
+      </p>
+      <div class="form-group">
+        <label class="form-label">Próxima fecha de facturación (dd-mm-yy)</label>
+        <input class="form-input" id="billing-input" placeholder="18-12-26"
+          value="${billing ? UI.formatDateDMY(billing) : ''}" />
+        <span class="form-hint" id="billing-hint"></span>
+      </div>
+      <div class="modal-footer">
+        ${billing ? '<button class="btn btn-danger" id="billing-clear">Quitar</button>' : ''}
+        <button class="btn btn-outline" id="billing-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="billing-save">Guardar</button>
+      </div>
+    `;
+
+    const input = document.getElementById('billing-input');
+    const hint = document.getElementById('billing-hint');
+
+    function updatePreview() {
+      const value = input.value.trim();
+      if (!value) {
+        hint.textContent = 'Sin fecha configurada, el mes de pago se ingresa a mano.';
+        return;
+      }
+      const mesPago = Store.previewCardMesPago(value, UI.formatDateDMY(new Date()));
+      if (!mesPago) {
+        hint.textContent = 'Fecha inválida. Usa el formato dd-mm-yy.';
+        return;
+      }
+      const parsed = UI.parseDateMY(mesPago);
+      hint.textContent = `Un gasto de hoy quedaría para pago ${UI.getMonthLabel(parsed.getMonth() + 1, parsed.getFullYear())} (${mesPago}).`;
+    }
+
+    input.addEventListener('input', updatePreview);
+    updatePreview();
+
+    document.getElementById('billing-cancel').addEventListener('click', () => UI.closeModal('modal-billing'));
+
+    document.getElementById('billing-save').addEventListener('click', () => {
+      const value = input.value.trim();
+      if (!value) { UI.toast('Ingresa una fecha de facturación', 'warning'); return; }
+      if (!Store.setBillingDate(value)) { UI.toast('Fecha inválida. Usa dd-mm-yy', 'warning'); return; }
+      UI.closeModal('modal-billing');
+      UI.toast(`Facturación guardada: ${UI.formatDateDMY(Store.getBillingDate())}`, 'success');
+      App.refresh();
+    });
+
+    const clearBtn = document.getElementById('billing-clear');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        Store.clearBillingDate();
+        UI.closeModal('modal-billing');
+        UI.toast('Fecha de facturación eliminada', 'success');
+        App.refresh();
+      });
+    }
+
+    UI.openModal('modal-billing');
+    input.focus();
+    input.select();
+  }
+
   function _renderModal(modalId) {
     const isDelete = modalId === 'modal-delete';
     const mode = isDelete ? 'delete' : 'download';
@@ -137,5 +209,5 @@ const Archivo = (() => {
     UI.toast('Exportación descargada como ZIP', 'success');
   }
 
-  return { openImport, openDownload, openDelete };
+  return { openImport, openDownload, openDelete, openBilling };
 })();

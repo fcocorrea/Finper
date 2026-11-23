@@ -15,6 +15,11 @@ const App = (() => {
 
   const _SHORT_MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
 
+  // Medios de pago que se facturan: su mes de pago se deriva de la fecha de
+  // facturación configurada en Archivo → Fecha Facturación.
+  const _CARD_METHODS = ['Tarjeta de crédito', 'Tarjeta de crédito en cuotas'];
+  function _isCardPayment(method) { return _CARD_METHODS.includes(method); }
+
   function getActiveMonths() {
     return state.rangeMonths || [{ month: state.month, year: state.year }];
   }
@@ -118,6 +123,10 @@ const App = (() => {
     document.getElementById('dropdown-archivo-descargar').addEventListener('click', (e) => {
       e.preventDefault();
       Archivo.openDownload();
+    });
+    document.getElementById('dropdown-archivo-facturacion').addEventListener('click', (e) => {
+      e.preventDefault();
+      Archivo.openBilling();
     });
   }
 
@@ -281,6 +290,7 @@ const App = (() => {
           <div class="form-group">
             <label class="form-label">Mes Pago (mm-yy)</label>
             <input class="form-input" id="add-mesPago" placeholder="05-26" value="${UI.formatDateMY(new Date())}" />
+            <span class="form-hint hidden" id="mesPago-hint"></span>
           </div>
         </div>
         <div class="form-group">
@@ -321,14 +331,48 @@ const App = (() => {
       UI.renderSelectOptions(document.getElementById('add-medioPago'), Store.getPaymentMethods(), 'Seleccionar medio...');
       UI.enableFormulaInput(document.getElementById('add-gasto'));
 
-      // Show cuotas field when "Tarjeta de crédito en cuotas" is selected
-      document.getElementById('add-medioPago').addEventListener('change', (e) => {
+      // Cuotas field + mes de pago automático para tarjetas de crédito
+      const fechaInput = document.getElementById('add-fecha');
+      const mesPagoInput = document.getElementById('add-mesPago');
+      const medioPagoSelect = document.getElementById('add-medioPago');
+      const mesPagoHint = document.getElementById('mesPago-hint');
+      // Último valor escrito por nosotros: si el usuario lo edita, se respeta.
+      let autoMesPago = mesPagoInput.value.trim();
+
+      function syncCardMesPago() {
         const cuotasGroup = document.getElementById('cuotas-group');
-        if (e.target.value === 'Tarjeta de crédito en cuotas') {
-          cuotasGroup.classList.remove('hidden');
-        } else {
-          cuotasGroup.classList.add('hidden');
+        const isCuotas = medioPagoSelect.value === 'Tarjeta de crédito en cuotas';
+        cuotasGroup.classList.toggle('hidden', !isCuotas);
+
+        mesPagoHint.classList.add('hidden');
+        if (!_isCardPayment(medioPagoSelect.value)) return;
+
+        if (!Store.getBillingDate()) {
+          mesPagoHint.textContent = 'Configura Archivo → Fecha Facturación para calcularlo automáticamente.';
+          mesPagoHint.classList.remove('hidden');
+          return;
         }
+
+        const computed = Store.calcCardMesPago(fechaInput.value.trim(), 0);
+        if (!computed) return;
+
+        const manual = mesPagoInput.value.trim() && mesPagoInput.value.trim() !== autoMesPago;
+        if (!manual) {
+          mesPagoInput.value = computed;
+          autoMesPago = computed;
+        }
+
+        const pay = UI.parseDateMY(computed);
+        const label = UI.getMonthLabel(pay.getMonth() + 1, pay.getFullYear());
+        mesPagoHint.textContent = isCuotas
+          ? `${manual ? 'Sugerencia' : 'Calculado'} por facturación: cuota 1 en ${label}, cada cuota avanza un mes.`
+          : `${manual ? 'Sugerencia' : 'Calculado'} por facturación: pago en ${label}.`;
+        mesPagoHint.classList.remove('hidden');
+      }
+
+      medioPagoSelect.addEventListener('change', syncCardMesPago);
+      fechaInput.addEventListener('change', () => {
+        if (_isCardPayment(medioPagoSelect.value)) syncCardMesPago();
       });
 
       // Autocomplete for comment with category prediction
@@ -393,7 +437,9 @@ const App = (() => {
 
             Store.add('expenses', {
               fecha: `${dd}-${mm}-${yy}`,
-              mesPago: `${mm}-${yy}`,
+              // Cada cuota cae en la factura siguiente; sin facturación
+              // configurada se mantiene el mes de la fecha de la cuota.
+              mesPago: Store.calcCardMesPago(fecha, i) || `${mm}-${yy}`,
               categoria,
               gasto: montoCuota,
               comentario: `${comentario} (Cuota ${i + 1}/${cuotas})`,

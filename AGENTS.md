@@ -56,6 +56,8 @@ After any data mutation, call `App.refresh()` to re-render.
 
 **Keys**: `finper_expenses`, `finper_incomes`, `finper_accounts`, plus metadata keys for categories, types, payment methods, and column definitions.
 
+**Settings (device-local, not synced)**: `finper_monthly_budget` and `finper_billing_date` (próxima facturación de la tarjeta, `dd-mm-yy`). `Store.calcCardMesPago(fecha, offset)` deriva el mes de pago de un gasto con tarjeta: facturación + 1 mes (+ `offset` cuotas).
+
 **Expense record**: `{ fecha (dd-mm-yy), mesPago (mm-yy), categoria, gasto, comentario, tipo, medioPago, id, _created, _updated }`
 
 **Income record**: `{ fecha (mm-yy), monto, fuente, id, _created, _updated }`

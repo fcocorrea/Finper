@@ -906,6 +906,7 @@ body {
 }
 
 .modal-footer #edit-row-delete,
+.modal-footer #billing-clear,
 .modal-footer #add-back {
   margin-right: auto;
 }

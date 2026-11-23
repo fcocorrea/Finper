@@ -18,6 +18,7 @@ const Store = (() => {
     incomeSources: 'finper_income_sources',
     savingsCategories: 'finper_savings_categories',
     monthlyBudget: 'finper_monthly_budget',
+    billingDate: 'finper_billing_date',
   };
 
   const DEFAULT_CATEGORIES = [
@@ -318,6 +319,96 @@ const Store = (() => {
     _set(KEYS.monthlyBudget, Math.max(0, parseCurrency(val)));
   }
 
+  // ---------- FECHA DE FACTURACIÓN (tarjeta de crédito) ----------
+  // Se guarda la próxima facturación en dd-mm-yy; si ya pasó, se proyecta al
+  // mismo día del mes siguiente cada vez que se consulta.
+  // ponytail: device-local, igual que el presupuesto — un dato, sin tabla.
+
+  function _pad2(n) { return String(n).padStart(2, '0'); }
+
+  function _parseDMY(str) {
+    if (typeof str !== 'string') return null;
+    const parts = str.split('-');
+    if (parts.length !== 3) return null;
+    const d = parseInt(parts[0]), m = parseInt(parts[1]), y = _fullYear(parts[2]);
+    if (!d || !m || m > 12 || d > 31) return null;
+    const date = new Date(y, m - 1, d);
+    // Rechaza fechas inexistentes que Date desborda (p. ej. 31-02 → marzo).
+    return date.getMonth() === m - 1 ? date : null;
+  }
+
+  function _startOfDay(date) {
+    return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  }
+
+  // Suma meses conservando el día de corte: 31 → último día del mes destino.
+  function _addMonths(date, months, anchorDay) {
+    const day = anchorDay || date.getDate();
+    const lastDay = new Date(date.getFullYear(), date.getMonth() + months + 1, 0).getDate();
+    return new Date(date.getFullYear(), date.getMonth() + months, Math.min(day, lastDay));
+  }
+
+  function _projectBilling(anchor, today) {
+    if (anchor >= today) return anchor;
+    const day = anchor.getDate();
+    let months = (today.getFullYear() - anchor.getFullYear()) * 12
+               + (today.getMonth() - anchor.getMonth());
+    let candidate = _addMonths(anchor, months, day);
+    while (candidate < today) {
+      months++;
+      candidate = _addMonths(anchor, months, day);
+    }
+    return candidate;
+  }
+
+  // Factura → mes de pago: el sueldo de fin de mes se usa para el mes
+  // siguiente, así que se suma un mes. `offset` son las cuotas siguientes.
+  function _mesPagoFor(billing, fechaStr, offset) {
+    const day = billing.getDate();
+    const purchase = _parseDMY(fechaStr);
+    let months = 0;
+    if (purchase) {
+      months = Math.max(0, (purchase.getFullYear() - billing.getFullYear()) * 12
+                         + (purchase.getMonth() - billing.getMonth()));
+      // Un gasto posterior al corte cae en la factura siguiente.
+      while (_addMonths(billing, months, day) <= purchase) months++;
+    }
+    const pay = _addMonths(billing, months + 1 + (offset || 0), day);
+    return `${_pad2(pay.getMonth() + 1)}-${String(pay.getFullYear()).slice(-2)}`;
+  }
+
+  function getBillingDate() {
+    const anchor = _parseDMY(_get(KEYS.billingDate));
+    if (!anchor) return null;
+    return _projectBilling(_startOfDay(anchor), _startOfDay(new Date()));
+  }
+
+  function setBillingDate(str) {
+    const parsed = _parseDMY(str);
+    if (!parsed) return false;
+    _set(KEYS.billingDate, `${_pad2(parsed.getDate())}-${_pad2(parsed.getMonth() + 1)}-${String(parsed.getFullYear()).slice(-2)}`);
+    return true;
+  }
+
+  function clearBillingDate() {
+    localStorage.removeItem(KEYS.billingDate);
+  }
+
+  // Mes de pago de un gasto con tarjeta. Sin facturación configurada no hay
+  // cálculo automático: devuelve '' y el formulario mantiene el valor manual.
+  function calcCardMesPago(fechaStr, offset = 0) {
+    const billing = getBillingDate();
+    return billing ? _mesPagoFor(billing, fechaStr, offset) : '';
+  }
+
+  // Igual que calcCardMesPago pero con una facturación sin guardar (vista previa).
+  function previewCardMesPago(billingStr, fechaStr, offset = 0) {
+    const anchor = _parseDMY(billingStr);
+    if (!anchor) return '';
+    const billing = _projectBilling(_startOfDay(anchor), _startOfDay(new Date()));
+    return _mesPagoFor(billing, fechaStr, offset);
+  }
+
   // ---------- EXPENSE TYPES ----------
   function getExpenseTypes() { return _get(KEYS.expenseTypes) || []; }
 
@@ -533,6 +624,7 @@ const Store = (() => {
     setDateMode, getByMonths, getByMonth, getRecordDateStr, parseRecordDate,
     getTotalIncome, getTotalExpenses, getTotalSavings, parseCurrency,
     getMonthlyBudget, setMonthlyBudget,
+    getBillingDate, setBillingDate, clearBillingDate, calcCardMesPago, previewCardMesPago,
     DEFAULT_COLUMNS,
   };
 })();

@@ -29,6 +29,7 @@ Finper/
 - **Tabla**: vista tabular con edición y eliminación inline
 - **Tabla Dinámica**: agrupación por mes×categoría (gastos), mes×fuente (ingresos), persona×tipo (cuentas)
 - **Cuotas**: al registrar gastos en cuotas, se generan automáticamente los registros futuros. Las cuentas por cobrar/pagar también admiten pago en cuotas: se registra una cuenta por mes con el monto dividido
+- **Fecha de facturación**: en Archivo → Fecha Facturación se configura el próximo corte de la tarjeta; los gastos con tarjeta calculan su mes de pago automáticamente (factura + 1 mes)
 - **Autocompletado**: sugerencias basadas en datos previos + predicción de categoría
 - **Importación**: soporte para .csv y .xlsx con validación de encabezados
 - **Edición**: gestión de columnas y categorías de gastos
